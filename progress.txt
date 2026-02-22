@@ -1,0 +1,49 @@
+Progress
+========
+
+2026-02-22
+----------
+- Added battery_pct field to docs (ARCHITECTURE.md schema, FIRMWARE.md struct, SRS.md payload)
+- Linear map: 3.0V = 0%, 4.2V = 100% from Thingy:91 X onboard LiPo (nPM1300 PMIC)
+- Decision: store only battery_v in DB (not battery_pct) — derive percentage in frontend
+- Fixed PMIC references: ADP5360 → nPM1300 across all docs
+
+- Created firmware/src/power.h + power.c (battery read via nPM1300 sensor API)
+- Created firmware/include/packet.h (feature_packet_t struct)
+- Integrated battery reading into main.c (prints voltage + percentage on boot)
+- Updated prj.conf (CONFIG_MFD, CONFIG_REGULATOR for nPM1300 driver chain)
+- Updated CMakeLists.txt (added power.c, include dir)
+
+- Created firmware/src/transport.h + transport.c (HTTPS POST to Supabase)
+  - TLS cert provisioning via modem_key_mgmt (sec_tag 42)
+  - GlobalSign Root CA for Supabase TLS chain
+  - NCS rest_client for blocking HTTPS POST
+  - JSON body with integer-only formatting (no float printf)
+- Created firmware/certs/GlobalSignRootCA.pem
+- Added CONFIG_REST_CLIENT, CONFIG_MODEM_KEY_MGMT, CONFIG_DATE_TIME, CONFIG_POSIX_API
+- Modified main.c: transport_init() before LTE, POST loop every 10 sec
+- Conversion: sensor_value (m/s²) → integer milliG via int64 math
+
+- Fixed -105 (ENOBUFS) error: increased HEAP_MEM_POOL_SIZE from 8KB → 16KB
+- Added CONFIG_REST_CLIENT_LOG_LEVEL_DBG for debugging
+- Increased resp_buf from 512 → 2048 bytes
+
+- END-TO-END WORKING: HTTP 201 from Supabase confirmed
+  - Accel readings (x_mg, y_mg, z_mg) + battery_v posting every 10 sec
+  - Timestamps from modem via date_time library
+  - Data visible in Supabase accel_readings table
+
+- Updated all docs (v0.1 → v0.2) to match actual implementation:
+  - ADXL362/SPI → ADXL367/I2C
+  - nRF9160 → nRF9151, Thingy:91 → Thingy:91 X
+  - MQTT/AWS/TimescaleDB/Grafana → HTTPS POST/Supabase/custom frontend
+  - FFT/feature packets → raw accel + battery JSON
+  - Build/flash instructions updated for nrfutil DFU
+
+TODO
+----
+- Investigate z-axis reading (~92 mg, expected ~1000 mg) — possible ADXL367 driver scale issue
+- Add battery_v column to Supabase table (ALTER TABLE accel_readings ADD COLUMN battery_v float)
+- Add PSM sleep between POST cycles to reduce power consumption
+- On-node FFT / feature extraction (future)
+- Frontend: display real-time accel + battery from Supabase

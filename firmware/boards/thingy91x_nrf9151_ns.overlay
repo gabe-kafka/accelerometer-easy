@@ -1,0 +1,5 @@
+/* Enable the onboard ADXL367 accelerometer (I2C2, addr 0x1d) */
+
+&accelerometer_lp {
+	status = "okay";
+};
