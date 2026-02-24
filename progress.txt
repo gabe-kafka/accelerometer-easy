@@ -55,6 +55,19 @@ Progress
 - Repo cleanup: deleted legacy packet.h, updated docs for raw pipeline,
   added .env to .gitignore, removed stale branches
 
+2026-02-24
+----------
+- Implemented remote-control data stream (SRS-705: downlink config)
+  - Added node_config Supabase table: node_id (PK), sample_interval_ms INT DEFAULT 10000
+  - transport_fetch_config(): GET /rest/v1/node_config?node_id=eq.<IMEI>&select=sample_interval_ms
+    - Parses JSON array response, validates range 1 s–1 hr, updates interval in place
+    - No row found → leaves interval unchanged (safe default)
+  - transport_send_reading() now accepts node_id param, includes "node_id" field in JSON
+  - main.c: reads IMEI via AT+CGSN on startup, uses as node_id
+  - main loop: POST → fetch_config → sleep(sample_interval_ms)
+    → remote change takes effect within one cycle
+  - Updated ARCHITECTURE.md: node_config schema, downlink endpoint, state machine
+
 TODO
 ----
 - Add LTE-M reconnect logic (modem drops after ~10 min, no retry in main loop)

@@ -17,6 +17,9 @@
 #define ADXL367_X_DATA_H   0x0Eu
 #define ADXL367_DATA_RDY   BIT(0)
 
+/* Default POST interval; overridden by remote config from Supabase node_config table */
+#define DEFAULT_SAMPLE_INTERVAL_MS 10000U
+
 /* I2C bus + address from device tree (ADXL367 @ 0x1d on I2C2) */
 static const struct i2c_dt_spec accel_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(accel));
 
@@ -65,6 +68,31 @@ static int read_accel_raw(int16_t *x, int16_t *y, int16_t *z)
 	}
 
 	return 0;
+}
+
+/*
+ * Read IMEI from modem via AT+CGSN and store as a NUL-terminated
+ * string of up to 15 decimal digits.  Falls back to "unknown" on error.
+ */
+static void read_imei(char *buf, size_t buf_len)
+{
+	char at_buf[32] = {0};
+	int j = 0;
+
+	if (nrf_modem_at_cmd(at_buf, sizeof(at_buf), "AT+CGSN") == 0) {
+		for (int i = 0; at_buf[i] && j < 15 && j < (int)buf_len - 1; i++) {
+			if (at_buf[i] >= '0' && at_buf[i] <= '9') {
+				buf[j++] = at_buf[i];
+			}
+		}
+	}
+
+	if (j == 0) {
+		strncpy(buf, "unknown", buf_len - 1);
+		buf[buf_len - 1] = '\0';
+	} else {
+		buf[j] = '\0';
+	}
 }
 
 static int modem_connect(void)
@@ -174,12 +202,24 @@ int main(void)
 	/* --- Step 2: LTE-M modem + TLS cert --- */
 	modem_connect();
 
+	/* Read IMEI now that modem is initialized */
+	char node_id[20] = {0};
+
+	read_imei(node_id, sizeof(node_id));
+	printk("Node ID (IMEI): %s\n", node_id);
+
 	/* Wait for date_time to sync from modem after LTE attach */
 	printk("Waiting for time sync...\n");
 	k_msleep(3000);
 
-	/* --- Step 3: POST raw readings to Supabase every 10 seconds --- */
-	printk("\n--- Posting raw accel + battery to Supabase every 10s ---\n");
+	/* Fetch initial remote config (sample interval) */
+	uint32_t sample_interval_ms = DEFAULT_SAMPLE_INTERVAL_MS;
+
+	transport_fetch_config(node_id, &sample_interval_ms);
+	printk("Sample interval: %u ms\n", sample_interval_ms);
+
+	/* --- Step 3: POST raw readings to Supabase, re-fetch config each cycle --- */
+	printk("\n--- Posting raw accel + battery to Supabase ---\n");
 
 	while (1) {
 		int16_t x, y, z;
@@ -189,7 +229,7 @@ int main(void)
 		ret = read_accel_raw(&x, &y, &z);
 		if (ret) {
 			printk("read_accel_raw failed: %d\n", ret);
-			k_msleep(10000);
+			k_msleep(sample_interval_ms);
 			continue;
 		}
 
@@ -205,9 +245,12 @@ int main(void)
 		}
 
 		/* POST to Supabase */
-		transport_send_reading(x, y, z, bat_mv);
+		transport_send_reading(node_id, x, y, z, bat_mv);
 
-		k_msleep(10000);
+		/* Re-fetch remote config so interval changes take effect next cycle */
+		transport_fetch_config(node_id, &sample_interval_ms);
+
+		k_msleep(sample_interval_ms);
 	}
 
 	return 0;

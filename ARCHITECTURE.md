@@ -53,7 +53,7 @@
 
 The Thingy:91 X includes an onboard ADXL367 accelerometer connected to the nRF9151 via I2C. No hardware modifications are required — the stock platform is used as-is.
 
-**Data rate:** 3 axes × 14-bit — sampled on demand (once per 10-second POST cycle).
+**Data rate:** 3 axes × 14-bit — sampled on demand. POST interval is remotely configurable (default 10 s, range 1 s – 1 hr) via the `node_config` Supabase table.
 **Interface:** Direct I2C register reads (bypass Zephyr sensor API due to 10x scale bug in NCS v2.9 driver).
 **Output:** Raw 14-bit signed counts. At ±2g range: 1 LSB = 250 µg, ~4000 counts = 1g. Normalization deferred to post-processing.
 
@@ -73,15 +73,17 @@ The Thingy:91 X includes an onboard ADXL367 accelerometer connected to the nRF91
 
 ## S3 — Communications
 
-Readings transmit every 10 seconds over LTE-M via HTTPS POST to Supabase REST API.
+Readings transmit over LTE-M via HTTPS POST to Supabase REST API. The POST interval is remotely configurable (default 10 s); after each POST the firmware GETs `node_config` and applies the new interval immediately.
 
 | Parameter | Value |
 |-----------|-------|
 | Modem | nRF9151 integrated LTE-M / NB-IoT |
 | Protocol | HTTPS POST (TLS 1.2, port 443) |
-| Endpoint | `https://rcaglkgoyemcjaszaahu.supabase.co/rest/v1/accel_readings` |
+| Uplink endpoint | `https://rcaglkgoyemcjaszaahu.supabase.co/rest/v1/accel_readings` |
+| Downlink endpoint | `https://rcaglkgoyemcjaszaahu.supabase.co/rest/v1/node_config?node_id=eq.<IMEI>` |
 | Auth | Supabase anon key (API key header) |
-| Payload | JSON, ~80 bytes |
+| Uplink payload | JSON, ~100 bytes (includes `node_id`) |
+| Downlink response | JSON array `[{"sample_interval_ms":<ms>}]` |
 | TLS | Modem-offloaded, GlobalSign Root CA provisioned to sec_tag 42 |
 | Library | NCS `rest_client` (blocking HTTPS) |
 
@@ -156,11 +158,19 @@ Total compliance must keep **mount first resonance ≥ 200 Hz** (SRS-602).
 ```sql
 CREATE TABLE accel_readings (
   id         BIGSERIAL PRIMARY KEY,
+  node_id    TEXT NOT NULL,
   ts         TIMESTAMPTZ NOT NULL,
   x_raw      INT,
   y_raw      INT,
   z_raw      INT,
   battery_v  FLOAT
+);
+
+-- Remote config: one row per node, updated via dashboard or SQL.
+-- Device GETs this after each POST; sample_interval_ms takes effect next cycle.
+CREATE TABLE node_config (
+  node_id             TEXT PRIMARY KEY,  -- IMEI of the target node
+  sample_interval_ms  INT NOT NULL DEFAULT 10000
 );
 ```
 
@@ -185,7 +195,8 @@ CREATE TABLE accel_readings (
     ┌───►│  READ +  │ read accel (raw counts) + battery (mV)
     │    │  POST    │ HTTPS POST JSON to Supabase
     │    └─────┬────┘
-    │          │ wait 10 sec
+    │          │ HTTPS GET node_config → update sample_interval_ms
+    │          │ wait sample_interval_ms (default 10 s, remote-configurable)
     └──────────┘
 ```
 
