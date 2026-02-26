@@ -5,6 +5,7 @@
 #include <modem/nrf_modem_lib.h>
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
+#include <modem/pdn.h>
 #include <nrf_modem_at.h>
 
 #include <zephyr/dfu/mcuboot.h>
@@ -95,6 +96,54 @@ static void read_imei(char *buf, size_t buf_len)
 	}
 }
 
+/* Semaphore signalled by PDN event handler when data bearer activates */
+static K_SEM_DEFINE(pdn_active_sem, 0, 1);
+
+static void pdn_event_handler(uint8_t cid, enum pdn_event event, int reason)
+{
+	switch (event) {
+	case PDN_EVENT_CNEC_ESM:
+		printk("[PDN] ESM error (CID %u): reason %d\n", cid, reason);
+		break;
+	case PDN_EVENT_ACTIVATED:
+		printk("[PDN] Activated (CID %u) — data bearer ready\n", cid);
+		k_sem_give(&pdn_active_sem);
+		break;
+	case PDN_EVENT_DEACTIVATED:
+		printk("[PDN] Deactivated (CID %u)\n", cid);
+		break;
+	case PDN_EVENT_IPV6_UP:
+		printk("[PDN] IPv6 up (CID %u)\n", cid);
+		break;
+	case PDN_EVENT_IPV6_DOWN:
+		printk("[PDN] IPv6 down (CID %u)\n", cid);
+		break;
+	default:
+		printk("[PDN] Event %d (CID %u, reason %d)\n", event, cid, reason);
+		break;
+	}
+}
+
+static void modem_diag(void)
+{
+	char buf[128];
+
+	printk("--- Modem diagnostics ---\n");
+	if (nrf_modem_at_cmd(buf, sizeof(buf), "AT+CEREG?") == 0) {
+		printk("  CEREG:  %s", buf);
+	}
+	if (nrf_modem_at_cmd(buf, sizeof(buf), "AT+CGACT?") == 0) {
+		printk("  CGACT:  %s", buf);
+	}
+	if (nrf_modem_at_cmd(buf, sizeof(buf), "AT+CGDCONT?") == 0) {
+		printk("  CGDCONT:%s", buf);
+	}
+	if (nrf_modem_at_cmd(buf, sizeof(buf), "AT+CESQ") == 0) {
+		printk("  CESQ:   %s", buf);
+	}
+	printk("-------------------------\n");
+}
+
 static int modem_connect(void)
 {
 	int err;
@@ -132,6 +181,8 @@ static int modem_connect(void)
 		printk("IMSI: %s", buf);
 	}
 
+	pdn_default_ctx_cb_reg(pdn_event_handler);
+
 	printk("Connecting to LTE network (this may take 10-60 seconds)...\n");
 	err = lte_lc_connect();
 	if (err) {
@@ -139,6 +190,16 @@ static int modem_connect(void)
 		return err;
 	}
 	printk("Connected to LTE!\n");
+
+	printk("Waiting for PDN activation (up to 30s)...\n");
+	err = k_sem_take(&pdn_active_sem, K_SECONDS(30));
+	if (err) {
+		printk("WARNING: PDN activation timed out — DNS will likely fail\n");
+	} else {
+		printk("PDN active — data bearer confirmed\n");
+	}
+
+	modem_diag();
 
 	/* Print signal strength */
 	err = modem_info_init();
@@ -181,6 +242,7 @@ static int modem_reconnect(void)
 	}
 
 	k_msleep(1000);
+	k_sem_reset(&pdn_active_sem);
 
 	err = lte_lc_connect();
 	if (err) {
@@ -188,10 +250,15 @@ static int modem_reconnect(void)
 		return err;
 	}
 
-	printk("LTE reconnected.\n");
+	printk("LTE reconnected — waiting for PDN activation (up to 30s)...\n");
+	err = k_sem_take(&pdn_active_sem, K_SECONDS(30));
+	if (err) {
+		printk("WARNING: PDN activation timed out after reconnect\n");
+	} else {
+		printk("PDN active after reconnect\n");
+	}
 
-	/* Allow date_time to re-sync from network time */
-	k_msleep(3000);
+	modem_diag();
 
 	return 0;
 }
