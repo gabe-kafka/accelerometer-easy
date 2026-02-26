@@ -79,7 +79,16 @@ Progress
   - Config fetch remains best-effort (errors don't trigger reconnect)
   - Updated FIRMWARE.md POST loop description and ARCHITECTURE.md state machine
 
+- LTE connectivity investigation (ongoing)
+  - Device getting EMM cause 8 (EPS services not allowed) — carrier-level rejection
+  - Hologram dashboard: SIM is "Ready", not blacklisted on their end
+  - Last Hologram session: Feb 12 — Feb 22 DB entries were coming over USB, not LTE
+  - Firmware already logs IMEI at boot: "Node ID (IMEI): <imei>" (main.c:247)
+  - Next: compare boot IMEI against Hologram dashboard to confirm correct SIM/device pairing
+  - Next: swap SIMs between devices to isolate whether issue is SIM or modem hardware
+
 TODO
 ----
+- Resolve EMM cause 8 LTE rejection (swap SIM test, verify IMEI vs Hologram)
 - Add PSM sleep between POST cycles to reduce power consumption
 - On-node FFT / feature extraction (future)
