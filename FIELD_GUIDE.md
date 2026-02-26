@@ -37,16 +37,22 @@
 
 ```
 1. Connect Thingy:91 X via USB
-2. Flash:
+2. Set the slide switch to nRF91 position (away from nRF53 label).
+   - nRF91 position: USB serial → nRF9151 (LTE chip) — you see firmware logs
+   - nRF53 position: USB serial → nRF5340 (BLE bridge) — logs go nowhere
+   - Flashing via nrfutil works in EITHER position (routes through nRF5340 bridge).
+     The switch only affects which chip the serial terminal talks to.
+3. Flash:
    nrfutil device program --firmware ~/ncs/build/dfu_application.zip
-3. Monitor serial:
+4. Monitor serial:
    screen /dev/tty.usbmodem102 115200
-4. Verify output:
+5. Verify output:
    - "ADXL367 accelerometer ready."
    - "Battery: X.XXX V (XX %)"
+   - "Node ID (IMEI): XXXXXXXXXXXXXXX"
    - "Connected to LTE!"
    - "HTTP 201" (data reaching Supabase)
-5. Check Supabase dashboard for new rows in accel_readings
+6. Check Supabase dashboard for new rows in accel_readings
 ```
 
 ### 1.3 Set Node ID
@@ -178,6 +184,7 @@ Same as Phase 1 §2.3. Additionally:
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
+| Firmware flashes OK but zero serial output | Slide switch in nRF53 position — USB serial routed to BLE chip, not LTE chip | Move slide switch to nRF91 position, press reset. Flashing still works in either position. |
 | No packets for > 2 hr | PSM timer stuck / modem crash | Wait for watchdog reset (30 sec). If persists > 6 hr, power cycle. |
 | Packet received but peaks all < 0.1 mg | ADXL367 in standby / SPI fault | Reflash firmware. Check onboard SPI bus via RTT debug. |
 | Battery dropping despite solar | Panel disconnected or shaded | Check cable gland, verify panel orientation. |
