@@ -68,8 +68,18 @@ Progress
     → remote change takes effect within one cycle
   - Updated ARCHITECTURE.md: node_config schema, downlink endpoint, state machine
 
+2026-02-26
+----------
+- Fixed LTE-M reconnect bug (modem dropped after ~10 min with no recovery)
+  - Added modem_reconnect(): lte_lc_offline() → 1s delay → lte_lc_connect()
+    - offline() forces full de-registration so connect() does a real re-attach,
+      not a no-op return because modem still thinks it's registered
+    - 3s post-reconnect delay for date_time re-sync
+  - POST loop: on transport_send_reading() failure → modem_reconnect() → retry once
+  - Config fetch remains best-effort (errors don't trigger reconnect)
+  - Updated FIRMWARE.md POST loop description and ARCHITECTURE.md state machine
+
 TODO
 ----
-- Add LTE-M reconnect logic (modem drops after ~10 min, no retry in main loop)
 - Add PSM sleep between POST cycles to reduce power consumption
 - On-node FFT / feature extraction (future)

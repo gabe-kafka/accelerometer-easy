@@ -89,7 +89,10 @@ POST loop (infinite):
      - Parse 14-bit signed values with sign extension
   2. Read battery voltage (power_read_battery)
   3. POST raw counts to Supabase (transport_send_reading, includes node_id)
+     - On failure: modem_reconnect() → lte_lc_offline() + lte_lc_connect()
+       then retry POST once
   4. GET node_config from Supabase (transport_fetch_config) → update interval
+     (best-effort; errors ignored)
   5. Sleep sample_interval_ms (default 10 s, remote-configurable 1 s–1 hr)
 ```
 

@@ -195,6 +195,7 @@ CREATE TABLE node_config (
     ┌───►│  READ +  │ read accel (raw counts) + battery (mV)
     │    │  POST    │ HTTPS POST JSON to Supabase
     │    └─────┬────┘
+    │          │ on POST error → lte_lc_offline() + lte_lc_connect() → retry
     │          │ HTTPS GET node_config → update sample_interval_ms
     │          │ wait sample_interval_ms (default 10 s, remote-configurable)
     └──────────┘

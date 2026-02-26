@@ -158,6 +158,44 @@ static int modem_connect(void)
 	return 0;
 }
 
+/*
+ * Force the modem offline then reconnect.  Called when a transport
+ * operation fails, indicating the LTE link has dropped.
+ *
+ * lte_lc_offline() drives the modem to AT+CFUN=4, which tears down
+ * any open sockets and deregisters from the network — ensuring
+ * lte_lc_connect() performs a full re-registration rather than
+ * returning immediately because the modem still thinks it's attached.
+ *
+ * Returns 0 on success, negative errno if reconnect fails.
+ */
+static int modem_reconnect(void)
+{
+	int err;
+
+	printk("LTE link lost — reconnecting...\n");
+
+	err = lte_lc_offline();
+	if (err) {
+		printk("lte_lc_offline failed: %d (continuing)\n", err);
+	}
+
+	k_msleep(1000);
+
+	err = lte_lc_connect();
+	if (err) {
+		printk("lte_lc_connect failed: %d\n", err);
+		return err;
+	}
+
+	printk("LTE reconnected.\n");
+
+	/* Allow date_time to re-sync from network time */
+	k_msleep(3000);
+
+	return 0;
+}
+
 int main(void)
 {
 	printk("\n=== Thingy:91 X — Raw Accel + LTE + Supabase ===\n\n");
@@ -244,10 +282,16 @@ int main(void)
 			       bat_mv / 1000, bat_mv % 1000, bat_pct);
 		}
 
-		/* POST to Supabase */
-		transport_send_reading(node_id, x, y, z, bat_mv);
+		/* POST to Supabase — on failure, reconnect LTE and retry once */
+		ret = transport_send_reading(node_id, x, y, z, bat_mv);
+		if (ret) {
+			printk("POST failed (%d) — reconnecting LTE\n", ret);
+			if (modem_reconnect() == 0) {
+				transport_send_reading(node_id, x, y, z, bat_mv);
+			}
+		}
 
-		/* Re-fetch remote config so interval changes take effect next cycle */
+		/* Re-fetch remote config (best-effort; ignore errors) */
 		transport_fetch_config(node_id, &sample_interval_ms);
 
 		k_msleep(sample_interval_ms);
