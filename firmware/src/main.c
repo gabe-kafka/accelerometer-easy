@@ -280,6 +280,7 @@ int main(void)
 		if (power_read_battery(&bat_mv, &bat_pct) == 0) {
 			printk("Battery: %d.%03d V  (%u %%)\n",
 			       bat_mv / 1000, bat_mv % 1000, bat_pct);
+			power_check_charging(bat_mv);
 		}
 
 		/* POST to Supabase — on failure, reconnect LTE and retry once */
