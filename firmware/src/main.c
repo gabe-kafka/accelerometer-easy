@@ -256,43 +256,51 @@ int main(void)
 	transport_fetch_config(node_id, &sample_interval_ms);
 	printk("Sample interval: %u ms\n", sample_interval_ms);
 
-	/* --- Step 3: POST raw readings to Supabase, re-fetch config each cycle --- */
-	printk("\n--- Posting raw accel + battery to Supabase ---\n");
+	/* --- Step 3: Batch 10 samples, POST as JSON array --- */
+	printk("\n--- Batch mode: 10 samples per POST ---\n");
+
+	#define BATCH_SIZE 100
 
 	while (1) {
-		int16_t x, y, z;
-		int ret;
-
-		/* Read raw accelerometer via I2C */
-		ret = read_accel_raw(&x, &y, &z);
-		if (ret) {
-			printk("read_accel_raw failed: %d\n", ret);
-			k_msleep(sample_interval_ms);
-			continue;
-		}
-
-		printk("Accel raw: x=%d  y=%d  z=%d  (counts)\n", x, y, z);
-
-		/* Read battery */
+		struct accel_sample batch[BATCH_SIZE];
 		int32_t bat_mv = 0;
 		uint8_t bat_pct = 0;
+		int ret;
 
+		/* Collect 10 samples */
+		for (int i = 0; i < BATCH_SIZE; i++) {
+			ret = read_accel_raw(&batch[i].x, &batch[i].y,
+					     &batch[i].z);
+			if (ret) {
+				printk("read_accel_raw failed: %d\n", ret);
+				batch[i].x = 0;
+				batch[i].y = 0;
+				batch[i].z = 0;
+			}
+			k_msleep(40);
+		}
+
+		printk("Collected %d samples\n", BATCH_SIZE);
+
+		/* Read battery */
 		if (power_read_battery(&bat_mv, &bat_pct) == 0) {
 			printk("Battery: %d.%03d V  (%u %%)\n",
 			       bat_mv / 1000, bat_mv % 1000, bat_pct);
-			power_check_charging(bat_mv);
 		}
 
-		/* POST to Supabase — on failure, reconnect LTE and retry once */
-		ret = transport_send_reading(node_id, x, y, z, bat_mv);
+		/* POST batch */
+		ret = transport_send_batch(node_id, batch, BATCH_SIZE,
+					   bat_mv);
 		if (ret) {
-			printk("POST failed (%d) — reconnecting LTE\n", ret);
+			printk("Batch POST failed (%d) — reconnecting\n",
+			       ret);
 			if (modem_reconnect() == 0) {
-				transport_send_reading(node_id, x, y, z, bat_mv);
+				transport_send_batch(node_id, batch,
+						    BATCH_SIZE, bat_mv);
 			}
 		}
 
-		/* Re-fetch remote config (best-effort; ignore errors) */
+		/* Re-fetch remote config */
 		transport_fetch_config(node_id, &sample_interval_ms);
 
 		k_msleep(sample_interval_ms);

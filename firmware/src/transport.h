@@ -36,4 +36,12 @@ int transport_send_reading(const char *node_id,
  */
 int transport_fetch_config(const char *node_id, uint32_t *sample_interval_ms);
 
+struct accel_sample {
+	int16_t x, y, z;
+};
+
+int transport_send_batch(const char *node_id,
+			 const struct accel_sample *samples,
+			 int count, int battery_mv);
+
 #endif /* TRANSPORT_H */

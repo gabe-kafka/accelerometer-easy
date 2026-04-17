@@ -17,10 +17,4 @@ int power_init(void);
  */
 int power_read_battery(int32_t *voltage_mv, uint8_t *pct);
 
-/**
- * Re-enable charging if battery is below threshold.
- * Call periodically from main loop.
- */
-int power_check_charging(int32_t voltage_mv);
-
 #endif /* POWER_H */

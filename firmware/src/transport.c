@@ -26,6 +26,7 @@ static const char ca_cert[] = {
 
 /* Buffers */
 static char body_buf[256];
+static char batch_buf[16384];
 static char resp_buf[2048];
 static char config_url_buf[128];
 
@@ -224,6 +225,98 @@ int transport_fetch_config(const char *node_id, uint32_t *sample_interval_ms)
 		} else {
 			printk("fetch_config: no config row for node %s\n", node_id);
 		}
+	}
+
+	return 0;
+}
+
+int transport_send_batch(const char *node_id,
+			 const struct accel_sample *samples,
+			 int count, int battery_mv)
+{
+	int err;
+	int64_t ts_ms;
+	int pos = 0;
+
+	err = date_time_now(&ts_ms);
+	if (err) {
+		printk("date_time_now failed: %d\n", err);
+		ts_ms = 0;
+	}
+
+	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos, "[");
+
+	for (int i = 0; i < count; i++) {
+		int64_t sample_ms = ts_ms - (int64_t)(count - 1 - i) * 40;
+		time_t sample_sec = sample_ms / 1000;
+		int sample_msec = (int)(sample_ms % 1000);
+		if (sample_msec < 0) sample_msec += 1000;
+		struct tm tm_buf;
+
+		gmtime_r(&sample_sec, &tm_buf);
+
+		pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos,
+			"%s{\"node_id\":\"%s\","
+			"\"ts\":\"%04d-%02d-%02dT%02d:%02d:%02d.%03dZ\","
+			"\"x_raw\":%d,\"y_raw\":%d,\"z_raw\":%d,"
+			"\"battery_v\":%d.%03d}",
+			i > 0 ? "," : "",
+			node_id,
+			tm_buf.tm_year + 1900, tm_buf.tm_mon + 1,
+			tm_buf.tm_mday, tm_buf.tm_hour,
+			tm_buf.tm_min, tm_buf.tm_sec, sample_msec,
+			samples[i].x, samples[i].y, samples[i].z,
+			battery_mv / 1000, battery_mv % 1000);
+
+		if (pos >= (int)sizeof(batch_buf) - 2) {
+			printk("batch_buf overflow at sample %d\n", i);
+			return -ENOMEM;
+		}
+	}
+
+	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos, "]");
+
+	static const char *headers[] = {
+		"apikey: " SUPABASE_ANON_KEY "\r\n",
+		"Content-Type: application/json\r\n",
+		"Prefer: return=minimal\r\n",
+		NULL
+	};
+
+	struct rest_client_req_context req;
+	struct rest_client_resp_context resp;
+
+	rest_client_request_defaults_set(&req);
+	req.host		= SUPABASE_HOST;
+	req.port		= SUPABASE_PORT;
+	req.url			= SUPABASE_URL;
+	req.sec_tag		= TLS_SEC_TAG;
+	req.tls_peer_verify	= REST_CLIENT_TLS_DEFAULT_PEER_VERIFY;
+	req.http_method		= HTTP_POST;
+	req.header_fields	= headers;
+	req.body		= batch_buf;
+	req.body_len		= pos;
+	req.resp_buff		= resp_buf;
+	req.resp_buff_len	= sizeof(resp_buf);
+	req.timeout_ms		= 30000;
+
+	printk("POST %s (%d bytes, %d samples)...\n",
+	       SUPABASE_URL, pos, count);
+
+	err = rest_client_request(&req, &resp);
+	if (err) {
+		printk("batch POST failed: %d\n", err);
+		return err;
+	}
+
+	printk("HTTP %d\n", resp.http_status_code);
+
+	if (resp.http_status_code != 201 &&
+	    resp.http_status_code != 200) {
+		printk("Unexpected status. Body: %.*s\n",
+		       (int)resp.response_len,
+		       resp.response ? resp.response : "");
+		return -EIO;
 	}
 
 	return 0;

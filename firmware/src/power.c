@@ -2,7 +2,6 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
-#include <zephyr/drivers/charger.h>
 
 /* nPM1300 charger node on the Thingy:91 X */
 static const struct device *charger = DEVICE_DT_GET(DT_NODELABEL(npm1300_charger));
@@ -48,17 +47,5 @@ int power_read_battery(int32_t *voltage_mv, uint8_t *pct)
 				 (VBAT_FULL_MV - VBAT_EMPTY_MV));
 	}
 
-	return 0;
-}
-
-#define RECHARGE_THRESHOLD_MV 4170
-
-int power_check_charging(int32_t voltage_mv)
-{
-	if (voltage_mv > 0 && voltage_mv < RECHARGE_THRESHOLD_MV) {
-		printk("Battery %d mV < %d mV — re-enabling charger\n",
-		       voltage_mv, RECHARGE_THRESHOLD_MV);
-		return charger_charge_enable(charger, true);
-	}
 	return 0;
 }
