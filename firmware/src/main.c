@@ -13,11 +13,27 @@
 #include "transport.h"
 
 /* ADXL367 register addresses */
-#define ADXL367_STATUS     0x0Bu
-#define ADXL367_X_DATA_H   0x0Eu
-#define ADXL367_DATA_RDY   BIT(0)
+#define ADXL367_STATUS         0x0Bu
+#define ADXL367_FIFO_ENTRIES_L 0x0Cu
+#define ADXL367_FIFO_ENTRIES_H 0x0Du
+#define ADXL367_X_DATA_H       0x0Eu
+#define ADXL367_DATA_RDY       BIT(0)
+#define ADXL367_FIFO_CONTROL   0x28u
+#define ADXL367_FILTER_CTL     0x2Cu
+#define ADXL367_POWER_CTL      0x2Du
 
-/* Default POST interval; overridden by remote config from Supabase node_config table */
+/* FIFO + ODR config */
+#define FIFO_MODE_STREAM       0x02u
+#define FILTER_25HZ_2G         0x01u  /* ±2g, 25 Hz ODR */
+#define POWER_MEAS             0x02u
+
+/* Batch sizing */
+#define BATCH_SAMPLES          100
+#define FIFO_MAX_SETS          170   /* 512 FIFO entries / 3 axes */
+#define FIFO_RAW_BUF_SIZE      (FIFO_MAX_SETS * 6)
+#define FIFO_DRAIN_MS          2000
+
+/* Default POST interval */
 #define DEFAULT_SAMPLE_INTERVAL_MS 10000U
 
 /* I2C bus + address from device tree (ADXL367 @ 0x1d on I2C2) */
@@ -68,6 +84,65 @@ static int read_accel_raw(int16_t *x, int16_t *y, int16_t *z)
 	}
 
 	return 0;
+}
+
+/* FIFO buffers */
+static struct accel_sample batch[BATCH_SAMPLES];
+static int batch_pos;
+static uint8_t fifo_raw[FIFO_RAW_BUF_SIZE];
+
+static int adxl367_fifo_init(void)
+{
+	int ret;
+
+	ret = i2c_reg_write_byte_dt(&accel_i2c, ADXL367_POWER_CTL, 0x00);
+	if (ret) { printk("ADXL367: standby failed: %d\n", ret); return ret; }
+	k_msleep(10);
+
+	ret = i2c_reg_write_byte_dt(&accel_i2c, ADXL367_FILTER_CTL, FILTER_25HZ_2G);
+	if (ret) { printk("ADXL367: ODR failed: %d\n", ret); return ret; }
+
+	ret = i2c_reg_write_byte_dt(&accel_i2c, ADXL367_FIFO_CONTROL, FIFO_MODE_STREAM);
+	if (ret) { printk("ADXL367: FIFO failed: %d\n", ret); return ret; }
+
+	ret = i2c_reg_write_byte_dt(&accel_i2c, ADXL367_POWER_CTL, POWER_MEAS);
+	if (ret) { printk("ADXL367: meas failed: %d\n", ret); return ret; }
+
+	printk("ADXL367: FIFO stream, 25 Hz, +/-2g\n");
+	return 0;
+}
+
+static int adxl367_drain_fifo(struct accel_sample *buf, int max_samples)
+{
+	uint8_t eh, el;
+	int ret;
+
+	ret = i2c_reg_read_byte_dt(&accel_i2c, ADXL367_FIFO_ENTRIES_H, &eh);
+	if (ret) return ret;
+	ret = i2c_reg_read_byte_dt(&accel_i2c, ADXL367_FIFO_ENTRIES_L, &el);
+	if (ret) return ret;
+
+	uint16_t entries = ((uint16_t)(eh & 0x03) << 8) | el;
+	int complete = entries / 3;
+	if (complete == 0) return 0;
+	if (complete > max_samples) complete = max_samples;
+	if (complete > FIFO_MAX_SETS) complete = FIFO_MAX_SETS;
+
+	ret = i2c_burst_read_dt(&accel_i2c, ADXL367_X_DATA_H,
+				fifo_raw, complete * 6);
+	if (ret) return ret;
+
+	for (int i = 0; i < complete; i++) {
+		int b = i * 6;
+		int16_t x = (int16_t)(((fifo_raw[b+0] & 0x3F) << 8) | fifo_raw[b+1]);
+		if (x & 0x2000) x |= 0xC000;
+		int16_t y = (int16_t)(((fifo_raw[b+2] & 0x3F) << 8) | fifo_raw[b+3]);
+		if (y & 0x2000) y |= 0xC000;
+		int16_t z = (int16_t)(((fifo_raw[b+4] & 0x3F) << 8) | fifo_raw[b+5]);
+		if (z & 0x2000) z |= 0xC000;
+		buf[i].x = x; buf[i].y = y; buf[i].z = z;
+	}
+	return complete;
 }
 
 /*
@@ -256,54 +331,60 @@ int main(void)
 	transport_fetch_config(node_id, &sample_interval_ms);
 	printk("Sample interval: %u ms\n", sample_interval_ms);
 
-	/* --- Step 3: Batch 10 samples, POST as JSON array --- */
-	printk("\n--- Batch mode: 10 samples per POST ---\n");
+	/* --- Enable ADXL367 FIFO at 25 Hz --- */
+	if (adxl367_fifo_init() != 0) {
+		printk("ERROR: ADXL367 FIFO init failed!\n");
+		return 0;
+	}
 
-	#define BATCH_SIZE 100
+	/* --- FIFO batch loop --- */
+	printk("\n--- FIFO 25 Hz -> batch of %d -> Supabase ---\n",
+	       BATCH_SAMPLES);
+	batch_pos = 0;
 
 	while (1) {
-		struct accel_sample batch[BATCH_SIZE];
-		int32_t bat_mv = 0;
-		uint8_t bat_pct = 0;
-		int ret;
+		int n = adxl367_drain_fifo(batch + batch_pos,
+					   BATCH_SAMPLES - batch_pos);
+		if (n > 0) {
+			batch_pos += n;
+			printk("FIFO: +%d (%d/%d)\n",
+			       n, batch_pos, BATCH_SAMPLES);
+		}
 
-		/* Collect 10 samples */
-		for (int i = 0; i < BATCH_SIZE; i++) {
-			ret = read_accel_raw(&batch[i].x, &batch[i].y,
-					     &batch[i].z);
+		if (batch_pos >= BATCH_SAMPLES) {
+			int32_t bat_mv = 0;
+			uint8_t bat_pct = 0;
+			int ret;
+
+			power_read_battery(&bat_mv, &bat_pct);
+			printk("Posting %d samples (bat %d.%03dV)...\n",
+			       batch_pos, bat_mv / 1000, bat_mv % 1000);
+
+			ret = transport_send_batch(node_id, batch,
+						   batch_pos, bat_mv);
 			if (ret) {
-				printk("read_accel_raw failed: %d\n", ret);
-				batch[i].x = 0;
-				batch[i].y = 0;
-				batch[i].z = 0;
+				printk("POST failed (%d) — reconnecting\n",
+				       ret);
+				if (modem_reconnect() == 0) {
+					transport_send_batch(node_id, batch,
+							     batch_pos,
+							     bat_mv);
+				}
 			}
-			k_msleep(40);
-		}
 
-		printk("Collected %d samples\n", BATCH_SIZE);
+			batch_pos = 0;
 
-		/* Read battery */
-		if (power_read_battery(&bat_mv, &bat_pct) == 0) {
-			printk("Battery: %d.%03d V  (%u %%)\n",
-			       bat_mv / 1000, bat_mv % 1000, bat_pct);
-		}
-
-		/* POST batch */
-		ret = transport_send_batch(node_id, batch, BATCH_SIZE,
-					   bat_mv);
-		if (ret) {
-			printk("Batch POST failed (%d) — reconnecting\n",
-			       ret);
-			if (modem_reconnect() == 0) {
-				transport_send_batch(node_id, batch,
-						    BATCH_SIZE, bat_mv);
+			/* Drain samples that arrived during POST */
+			n = adxl367_drain_fifo(batch, BATCH_SAMPLES);
+			if (n > 0) {
+				batch_pos = n;
+				printk("Post-TX drain: +%d\n", n);
 			}
+
+			transport_fetch_config(node_id, &sample_interval_ms);
 		}
 
-		/* Re-fetch remote config */
-		transport_fetch_config(node_id, &sample_interval_ms);
-
-		k_msleep(sample_interval_ms);
+		k_msleep(FIFO_DRAIN_MS);
 	}
 
 	return 0;
