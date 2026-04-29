@@ -49,7 +49,6 @@
 5. Verify output:
    - "ADXL367 accelerometer ready."
    - "Battery: X.XXX V (XX %)"
-   - "Node ID (IMEI): XXXXXXXXXXXXXXX"
    - "Connected to LTE!"
    - "HTTP 201" (data reaching Supabase)
 6. Check Supabase dashboard for new rows in accel_readings
@@ -57,7 +56,7 @@
 
 ### 1.3 Set Node ID
 
-Node ID auto-derives from IMEI (SRS-903). Label the physical unit with the last 6 digits of IMEI for field identification. Write on label tape, stick to enclosure.
+Label the physical unit manually for field identification. Write on label tape, stick to enclosure.
 
 ### 1.4 Verify Solar Charging
 
@@ -67,6 +66,31 @@ Node ID auto-derives from IMEI (SRS-903). Label the physical unit with the last 
 3. Check battery voltage trending up in RTT log
 4. Confirm no thermal issues (PMIC should stay < 40°C)
 ```
+
+### 1.5 Power Test Pads
+
+Use a multimeter in DC voltage mode. Put the black probe on `TP15` or
+`TP16` ground, then measure these pads with the red probe:
+
+| Pad | Signal | Expected reading | Meaning |
+|-----|--------|------------------|---------|
+| `TP12` | `VBUS` | ~5 V with USB-C plugged in | Confirms USB input power reaches the board |
+| `TP4` | `VBAT` | ~3.0-4.2 V | Actual LiPo battery voltage |
+| `TP17` | `VSYS_SW` | System rail, often near 5 V on USB | Confirms PMIC/system rail is powered |
+| `TP19` | `3V3` | ~3.3 V when board is on | Confirms logic rail is up |
+
+Observed during bench debug on 2026-04-28:
+
+```
+TP12 to TP16: 5.19 V   USB-C/VBUS present
+TP4  to TP16: 3.68 V   battery low-normal, not dead
+TP17 to TP16: 5.13 V   switched system rail powered from USB
+TP19 to TP16: 3.30 V   logic rail good
+```
+
+If `TP12` is ~5 V but `TP4` does not rise over 5-10 minutes, USB power is
+present but the battery charger is not actively charging. Check PMIC charger
+state, firmware charge policy, battery connector, and charge-path hardware.
 
 ---
 

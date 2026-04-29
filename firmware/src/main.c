@@ -7,6 +7,43 @@
 #include <modem/modem_info.h>
 #include <nrf_modem_at.h>
 
+static const char *reg_status_to_str(enum lte_lc_nw_reg_status s)
+{
+	switch (s) {
+	case LTE_LC_NW_REG_NOT_REGISTERED:      return "NOT_REGISTERED";
+	case LTE_LC_NW_REG_REGISTERED_HOME:     return "REGISTERED_HOME";
+	case LTE_LC_NW_REG_SEARCHING:           return "SEARCHING";
+	case LTE_LC_NW_REG_REGISTRATION_DENIED: return "REGISTRATION_DENIED";
+	case LTE_LC_NW_REG_UNKNOWN:             return "UNKNOWN";
+	case LTE_LC_NW_REG_REGISTERED_ROAMING:  return "REGISTERED_ROAMING";
+	case LTE_LC_NW_REG_UICC_FAIL:           return "UICC_FAIL";
+	default:                                return "?";
+	}
+}
+
+static void lte_handler(const struct lte_lc_evt *const evt)
+{
+	switch (evt->type) {
+	case LTE_LC_EVT_NW_REG_STATUS:
+		printk("LTE: reg=%s\n", reg_status_to_str(evt->nw_reg_status));
+		break;
+	case LTE_LC_EVT_LTE_MODE_UPDATE:
+		printk("LTE: mode=%s\n",
+		       evt->lte_mode == LTE_LC_LTE_MODE_LTEM  ? "LTE-M" :
+		       evt->lte_mode == LTE_LC_LTE_MODE_NBIOT ? "NB-IoT" : "NONE");
+		break;
+	case LTE_LC_EVT_RRC_UPDATE:
+		printk("LTE: RRC=%s\n",
+		       evt->rrc_mode == LTE_LC_RRC_MODE_CONNECTED ? "CONNECTED" : "IDLE");
+		break;
+	case LTE_LC_EVT_CELL_UPDATE:
+		printk("LTE: cell=%u TAC=%u\n", evt->cell.id, evt->cell.tac);
+		break;
+	default:
+		break;
+	}
+}
+
 #include <zephyr/dfu/mcuboot.h>
 
 #include "power.h"
@@ -17,6 +54,7 @@
 #define ADXL367_FIFO_ENTRIES_L 0x0Cu
 #define ADXL367_FIFO_ENTRIES_H 0x0Du
 #define ADXL367_X_DATA_H       0x0Eu
+#define ADXL367_I2C_FIFO_DATA  0x18u
 #define ADXL367_DATA_RDY       BIT(0)
 #define ADXL367_FIFO_CONTROL   0x28u
 #define ADXL367_FILTER_CTL     0x2Cu
@@ -32,9 +70,7 @@
 #define FIFO_MAX_SETS          170   /* 512 FIFO entries / 3 axes */
 #define FIFO_RAW_BUF_SIZE      (FIFO_MAX_SETS * 6)
 #define FIFO_DRAIN_MS          2000
-
-/* Default POST interval */
-#define DEFAULT_SAMPLE_INTERVAL_MS 10000U
+#define CHARGE_POLICY_TICK_MS  60000
 
 /* I2C bus + address from device tree (ADXL367 @ 0x1d on I2C2) */
 static const struct i2c_dt_spec accel_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(accel));
@@ -128,7 +164,7 @@ static int adxl367_drain_fifo(struct accel_sample *buf, int max_samples)
 	if (complete > max_samples) complete = max_samples;
 	if (complete > FIFO_MAX_SETS) complete = FIFO_MAX_SETS;
 
-	ret = i2c_burst_read_dt(&accel_i2c, ADXL367_X_DATA_H,
+	ret = i2c_burst_read_dt(&accel_i2c, ADXL367_I2C_FIFO_DATA,
 				fifo_raw, complete * 6);
 	if (ret) return ret;
 
@@ -145,31 +181,6 @@ static int adxl367_drain_fifo(struct accel_sample *buf, int max_samples)
 	return complete;
 }
 
-/*
- * Read IMEI from modem via AT+CGSN and store as a NUL-terminated
- * string of up to 15 decimal digits.  Falls back to "unknown" on error.
- */
-static void read_imei(char *buf, size_t buf_len)
-{
-	char at_buf[32] = {0};
-	int j = 0;
-
-	if (nrf_modem_at_cmd(at_buf, sizeof(at_buf), "AT+CGSN") == 0) {
-		for (int i = 0; at_buf[i] && j < 15 && j < (int)buf_len - 1; i++) {
-			if (at_buf[i] >= '0' && at_buf[i] <= '9') {
-				buf[j++] = at_buf[i];
-			}
-		}
-	}
-
-	if (j == 0) {
-		strncpy(buf, "unknown", buf_len - 1);
-		buf[buf_len - 1] = '\0';
-	} else {
-		buf[j] = '\0';
-	}
-}
-
 static int modem_connect(void)
 {
 	int err;
@@ -184,6 +195,11 @@ static int modem_connect(void)
 		return err;
 	}
 	printk("Modem initialized.\n");
+
+	/* Visibility during attach: state transitions, mode, RRC, cell ID.
+	 * Intentionally does NOT call modem_info or lte_lc_modem_events_enable
+	 * — both can fault from the callback thread during attach. */
+	lte_lc_register_handler(lte_handler);
 
 	/* Provision TLS cert before LTE connect */
 	err = transport_init();
@@ -291,6 +307,7 @@ int main(void)
 	} else {
 		int32_t bat_mv;
 		uint8_t bat_pct;
+		int32_t ibat_ma;
 
 		if (power_read_battery(&bat_mv, &bat_pct) == 0) {
 			printk("Battery: %d.%03d V  (%u %%)\n",
@@ -298,6 +315,33 @@ int main(void)
 		} else {
 			printk("WARNING: battery read failed\n");
 		}
+
+		if (power_read_current(&ibat_ma) == 0) {
+			const char *state = ibat_ma > 0 ? "charging"
+					  : ibat_ma < 0 ? "discharging"
+					  : "idle";
+			printk("Battery current: %d mA (%s)\n", ibat_ma, state);
+		} else {
+			printk("WARNING: battery current read failed\n");
+		}
+
+		bool vbus_present;
+
+		if (power_read_vbus(&vbus_present) == 0) {
+			printk("VBUS: %s\n", vbus_present ? "present" : "absent");
+		} else {
+			printk("WARNING: VBUS read failed\n");
+		}
+
+		uint8_t chg_state;
+
+		if (power_read_chg_state(&chg_state) == 0) {
+			printk("chg_state: 0x%02x\n", chg_state);
+		} else {
+			printk("WARNING: chg_state read failed\n");
+		}
+
+		power_charge_policy_init();
 	}
 
 	/* Show a few raw readings at startup */
@@ -315,21 +359,9 @@ int main(void)
 	/* --- Step 2: LTE-M modem + TLS cert --- */
 	modem_connect();
 
-	/* Read IMEI now that modem is initialized */
-	char node_id[20] = {0};
-
-	read_imei(node_id, sizeof(node_id));
-	printk("Node ID (IMEI): %s\n", node_id);
-
 	/* Wait for date_time to sync from modem after LTE attach */
 	printk("Waiting for time sync...\n");
 	k_msleep(3000);
-
-	/* Fetch initial remote config (sample interval) */
-	uint32_t sample_interval_ms = DEFAULT_SAMPLE_INTERVAL_MS;
-
-	transport_fetch_config(node_id, &sample_interval_ms);
-	printk("Sample interval: %u ms\n", sample_interval_ms);
 
 	/* --- Enable ADXL367 FIFO at 25 Hz --- */
 	if (adxl367_fifo_init() != 0) {
@@ -338,11 +370,17 @@ int main(void)
 	}
 
 	/* --- FIFO batch loop --- */
-	printk("\n--- FIFO 25 Hz -> batch of %d -> Supabase ---\n",
+	printk("\n--- FIFO 25 Hz continuous -> batch of %d -> Supabase ---\n",
 	       BATCH_SAMPLES);
 	batch_pos = 0;
+	int64_t last_charge_tick = k_uptime_get();
 
 	while (1) {
+		if (k_uptime_get() - last_charge_tick >= CHARGE_POLICY_TICK_MS) {
+			power_charge_policy_tick();
+			last_charge_tick = k_uptime_get();
+		}
+
 		int n = adxl367_drain_fifo(batch + batch_pos,
 					   BATCH_SAMPLES - batch_pos);
 		if (n > 0) {
@@ -357,31 +395,22 @@ int main(void)
 			int ret;
 
 			power_read_battery(&bat_mv, &bat_pct);
-			printk("Posting %d samples (bat %d.%03dV)...\n",
-			       batch_pos, bat_mv / 1000, bat_mv % 1000);
+			printk("Posting %d samples (bat %d.%03dV, %u%%)...\n",
+			       batch_pos, bat_mv / 1000, bat_mv % 1000,
+			       bat_pct);
 
-			ret = transport_send_batch(node_id, batch,
-						   batch_pos, bat_mv);
+			ret = transport_send_batch(batch, batch_pos, bat_pct);
 			if (ret) {
 				printk("POST failed (%d) — reconnecting\n",
 				       ret);
 				if (modem_reconnect() == 0) {
-					transport_send_batch(node_id, batch,
-							     batch_pos,
-							     bat_mv);
+					transport_send_batch(batch, batch_pos,
+							     bat_pct);
 				}
 			}
 
 			batch_pos = 0;
 
-			/* Drain samples that arrived during POST */
-			n = adxl367_drain_fifo(batch, BATCH_SAMPLES);
-			if (n > 0) {
-				batch_pos = n;
-				printk("Post-TX drain: +%d\n", n);
-			}
-
-			transport_fetch_config(node_id, &sample_interval_ms);
 		}
 
 		k_msleep(FIFO_DRAIN_MS);

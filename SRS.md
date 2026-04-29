@@ -91,7 +91,6 @@ SRS-807 [C] Multi-node comparison dashboard view                 → SC-3
 
 ```json
 {
-  "node_id":   "string",
   "ts":        "ISO-8601 UTC",
   "accel_rms": [x, y, z],
   "peaks":     [{"axis":"x","freq":0.0,"mag":0.0}, ...],
@@ -104,7 +103,6 @@ SRS-807 [C] Multi-node comparison dashboard view                 → SC-3
 ```
 SRS-901 [M] Schema as above, top 5 peaks per axis               → SC-3
 SRS-902 [S] JSON encoding (human-readable, ~80 bytes)            → SRS-303
-SRS-903 [M] Node ID from IMEI or HW serial                      → SC-3
 ```
 
 ## Traceability

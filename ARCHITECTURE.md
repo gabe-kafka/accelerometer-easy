@@ -80,9 +80,9 @@ Readings transmit over LTE-M via HTTPS POST to Supabase REST API. The POST inter
 | Modem | nRF9151 integrated LTE-M / NB-IoT |
 | Protocol | HTTPS POST (TLS 1.2, port 443) |
 | Uplink endpoint | `https://rcaglkgoyemcjaszaahu.supabase.co/rest/v1/accel_readings` |
-| Downlink endpoint | `https://rcaglkgoyemcjaszaahu.supabase.co/rest/v1/node_config?node_id=eq.<IMEI>` |
+| Downlink endpoint | `https://rcaglkgoyemcjaszaahu.supabase.co/rest/v1/node_config?select=sample_interval_ms&limit=1` |
 | Auth | Supabase anon key (API key header) |
-| Uplink payload | JSON, ~100 bytes (includes `node_id`) |
+| Uplink payload | JSON array of raw accel counts only: `{x,y,z}` |
 | Downlink response | JSON array `[{"sample_interval_ms":<ms>}]` |
 | TLS | Modem-offloaded, GlobalSign Root CA provisioned to sec_tag 42 |
 | Library | NCS `rest_client` (blocking HTTPS) |
@@ -158,18 +158,16 @@ Total compliance must keep **mount first resonance ≥ 200 Hz** (SRS-602).
 ```sql
 CREATE TABLE accel_readings (
   id         BIGSERIAL PRIMARY KEY,
-  node_id    TEXT NOT NULL,
-  ts         TIMESTAMPTZ NOT NULL,
-  x_raw      INT,
-  y_raw      INT,
-  z_raw      INT,
-  battery_v  FLOAT
+  ts         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  x          INT,
+  y          INT,
+  z          INT
 );
 
--- Remote config: one row per node, updated via dashboard or SQL.
+-- Remote config: single global row, updated via dashboard or SQL.
 -- Device GETs this after each POST; sample_interval_ms takes effect next cycle.
 CREATE TABLE node_config (
-  node_id             TEXT PRIMARY KEY,  -- IMEI of the target node
+  id                  BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
   sample_interval_ms  INT NOT NULL DEFAULT 10000
 );
 ```

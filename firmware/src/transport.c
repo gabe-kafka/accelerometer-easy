@@ -10,7 +10,7 @@
 
 #define TLS_SEC_TAG	42
 #define SUPABASE_HOST	"rcaglkgoyemcjaszaahu.supabase.co"
-#define SUPABASE_URL	"/rest/v1/accel_readings"
+#define SUPABASE_URL	"/rest/v1/accel_batches"
 #define SUPABASE_CONFIG_URL "/rest/v1/node_config"
 #define SUPABASE_PORT	443
 
@@ -28,7 +28,6 @@ static const char ca_cert[] = {
 static char body_buf[256];
 static char batch_buf[16384];
 static char resp_buf[2048];
-static char config_url_buf[128];
 
 int transport_init(void)
 {
@@ -66,35 +65,14 @@ int transport_init(void)
 	return 0;
 }
 
-int transport_send_reading(const char *node_id,
-			   int16_t x_raw, int16_t y_raw, int16_t z_raw,
-			   int battery_mv)
+int transport_send_reading(int16_t x_raw, int16_t y_raw, int16_t z_raw)
 {
 	int err;
-	int64_t ts_ms;
-	time_t ts_sec;
-	struct tm tm_buf;
-
-	/* Get current wall-clock time from the modem */
-	err = date_time_now(&ts_ms);
-	if (err) {
-		printk("date_time_now failed: %d (using epoch)\n", err);
-		ts_ms = 0;
-	}
-	ts_sec = ts_ms / 1000;
-	gmtime_r(&ts_sec, &tm_buf);
 
 	/* Build JSON body — raw 14-bit counts, no conversion */
 	int len = snprintf(body_buf, sizeof(body_buf),
-		"{\"node_id\":\"%s\","
-		"\"ts\":\"%04d-%02d-%02dT%02d:%02d:%02dZ\","
-		"\"x_raw\":%d,\"y_raw\":%d,\"z_raw\":%d,"
-		"\"battery_v\":%d.%03d}",
-		node_id,
-		tm_buf.tm_year + 1900, tm_buf.tm_mon + 1, tm_buf.tm_mday,
-		tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec,
-		x_raw, y_raw, z_raw,
-		battery_mv / 1000, battery_mv % 1000);
+		"{\"x\":%d,\"y\":%d,\"z\":%d}",
+		x_raw, y_raw, z_raw);
 
 	if (len < 0 || len >= (int)sizeof(body_buf)) {
 		printk("JSON body too large\n");
@@ -145,18 +123,9 @@ int transport_send_reading(const char *node_id,
 	return 0;
 }
 
-int transport_fetch_config(const char *node_id, uint32_t *sample_interval_ms)
+int transport_fetch_config(uint32_t *sample_interval_ms)
 {
 	int err;
-	int len;
-
-	/* Build URL: GET /rest/v1/node_config?node_id=eq.<imei>&select=sample_interval_ms */
-	len = snprintf(config_url_buf, sizeof(config_url_buf),
-		"%s?node_id=eq.%s&select=sample_interval_ms",
-		SUPABASE_CONFIG_URL, node_id);
-	if (len < 0 || len >= (int)sizeof(config_url_buf)) {
-		return -ENOMEM;
-	}
 
 	static const char *headers[] = {
 		"apikey: " SUPABASE_ANON_KEY "\r\n",
@@ -169,7 +138,7 @@ int transport_fetch_config(const char *node_id, uint32_t *sample_interval_ms)
 	rest_client_request_defaults_set(&req);
 	req.host		= SUPABASE_HOST;
 	req.port		= SUPABASE_PORT;
-	req.url			= config_url_buf;
+	req.url			= SUPABASE_CONFIG_URL "?select=sample_interval_ms&limit=1";
 	req.sec_tag		= TLS_SEC_TAG;
 	req.tls_peer_verify	= REST_CLIENT_TLS_DEFAULT_PEER_VERIFY;
 	req.http_method		= HTTP_GET;
@@ -180,7 +149,8 @@ int transport_fetch_config(const char *node_id, uint32_t *sample_interval_ms)
 	req.resp_buff_len	= sizeof(resp_buf);
 	req.timeout_ms		= 15000;
 
-	printk("GET %s...\n", config_url_buf);
+	printk("GET %s?select=sample_interval_ms&limit=1...\n",
+	       SUPABASE_CONFIG_URL);
 
 	err = rest_client_request(&req, &resp);
 	if (err) {
@@ -196,7 +166,7 @@ int transport_fetch_config(const char *node_id, uint32_t *sample_interval_ms)
 	/*
 	 * Response is a JSON array, e.g.:
 	 *   [{"sample_interval_ms":5000}]   — row found
-	 *   []                               — no row for this node_id
+	 *   []                               — no config row
 	 *
 	 * Parse by searching for the key and reading the following integer.
 	 */
@@ -223,50 +193,28 @@ int transport_fetch_config(const char *node_id, uint32_t *sample_interval_ms)
 				printk("fetch_config: value %u out of range, ignoring\n", val);
 			}
 		} else {
-			printk("fetch_config: no config row for node %s\n", node_id);
+			printk("fetch_config: no config row\n");
 		}
 	}
 
 	return 0;
 }
 
-int transport_send_batch(const char *node_id,
-			 const struct accel_sample *samples,
-			 int count, int battery_mv)
+int transport_send_batch(const struct accel_sample *samples, int count,
+			 uint8_t battery_pct)
 {
 	int err;
-	int64_t ts_ms;
 	int pos = 0;
 
-	err = date_time_now(&ts_ms);
-	if (err) {
-		printk("date_time_now failed: %d\n", err);
-		ts_ms = 0;
-	}
-
-	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos, "[");
+	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos,
+			"{\"battery_pct\":%u,\"samples\":[",
+			battery_pct);
 
 	for (int i = 0; i < count; i++) {
-		int64_t sample_ms = ts_ms - (int64_t)(count - 1 - i) * 40;
-		time_t sample_sec = sample_ms / 1000;
-		int sample_msec = (int)(sample_ms % 1000);
-		if (sample_msec < 0) sample_msec += 1000;
-		struct tm tm_buf;
-
-		gmtime_r(&sample_sec, &tm_buf);
-
 		pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos,
-			"%s{\"node_id\":\"%s\","
-			"\"ts\":\"%04d-%02d-%02dT%02d:%02d:%02d.%03dZ\","
-			"\"x_raw\":%d,\"y_raw\":%d,\"z_raw\":%d,"
-			"\"battery_v\":%d.%03d}",
+			"%s[%d,%d,%d]",
 			i > 0 ? "," : "",
-			node_id,
-			tm_buf.tm_year + 1900, tm_buf.tm_mon + 1,
-			tm_buf.tm_mday, tm_buf.tm_hour,
-			tm_buf.tm_min, tm_buf.tm_sec, sample_msec,
-			samples[i].x, samples[i].y, samples[i].z,
-			battery_mv / 1000, battery_mv % 1000);
+			samples[i].x, samples[i].y, samples[i].z);
 
 		if (pos >= (int)sizeof(batch_buf) - 2) {
 			printk("batch_buf overflow at sample %d\n", i);
@@ -274,7 +222,7 @@ int transport_send_batch(const char *node_id,
 		}
 	}
 
-	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos, "]");
+	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos, "]}");
 
 	static const char *headers[] = {
 		"apikey: " SUPABASE_ANON_KEY "\r\n",

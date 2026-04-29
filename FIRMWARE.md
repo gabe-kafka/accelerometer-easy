@@ -76,19 +76,18 @@ Boot sequence:
   5. Provision TLS cert (transport_init) — before LTE connect
   6. Read SIM ICCID + IMSI
   7. Connect LTE-M (lte_lc_connect, blocking)
-  8. Read IMEI via AT+CGSN → stored as node_id
-  9. Print RSRP signal strength
-  10. Wait 3 sec for date_time sync
-  11. Fetch initial sample interval from Supabase node_config table
-  12. Enter POST loop
+  8. Print RSRP signal strength
+  9. Wait 3 sec for date_time sync
+  10. Fetch initial sample interval from Supabase node_config table
+  11. Enter POST loop
 
 POST loop (infinite):
   1. Read ADXL367 raw 14-bit registers via I2C (read_accel_raw)
      - Poll STATUS register (0x0B) for DATA_RDY
      - Burst read 6 bytes from X_DATA_H (0x0E)
      - Parse 14-bit signed values with sign extension
-  2. Read battery voltage (power_read_battery)
-  3. POST raw counts to Supabase (transport_send_reading, includes node_id)
+  2. Read battery voltage (power_read_battery, local log only)
+  3. POST raw counts to Supabase (transport_send_reading)
      - On failure: modem_reconnect() → lte_lc_offline() + lte_lc_connect()
        then retry POST once
   4. GET node_config from Supabase (transport_fetch_config) → update interval
@@ -105,16 +104,14 @@ transport_init():
   3. If mismatch or missing, write cert (modem_key_mgmt_write)
   Must be called after modem init, before LTE connect.
 
-transport_send_reading(node_id, x_raw, y_raw, z_raw, battery_mv):
-  1. Get wall-clock time via date_time_now()
-  2. Format ISO-8601 timestamp with gmtime_r
-  3. Build JSON: {"node_id":"...","ts":"...","x_raw":N,"y_raw":N,"z_raw":N,"battery_v":N.NNN}
-  4. Set REST client headers (apikey, Content-Type, Prefer)
-  5. rest_client_request() — blocking HTTPS POST
-  6. Check HTTP status (expect 201 Created)
+transport_send_reading(x_raw, y_raw, z_raw):
+  1. Build JSON: {"x":N,"y":N,"z":N}
+  2. Set REST client headers (apikey, Content-Type, Prefer)
+  3. rest_client_request() — blocking HTTPS POST
+  4. Check HTTP status (expect 201 Created)
 
-transport_fetch_config(node_id, *sample_interval_ms):
-  1. Build URL: /rest/v1/node_config?node_id=eq.<node_id>&select=sample_interval_ms
+transport_fetch_config(*sample_interval_ms):
+  1. Build URL: /rest/v1/node_config?select=sample_interval_ms&limit=1
   2. HTTPS GET with apikey header
   3. Parse JSON array response — find "sample_interval_ms":<N>
   4. Validate range (1000–3600000 ms); update *sample_interval_ms if valid
@@ -143,18 +140,14 @@ power_read_battery(int32_t *voltage_mv, uint8_t *pct):
 
 ```json
 {
-  "node_id": "351358810123456",
-  "ts": "2026-02-22T23:24:17Z",
-  "x_raw": -47,
-  "y_raw": 100,
-  "z_raw": -3673,
-  "battery_v": 4.228
+  "x": -47,
+  "y": 100,
+  "z": -3673
 }
 ```
 
-~100 bytes per POST. Raw 14-bit signed counts (range: -8192 to +8191).
+Raw 14-bit signed counts (range: -8192 to +8191).
 At ±2g range: 1 LSB = 250 µg → ~4000 counts = 1g.
-`battery_v` formatted as `millivolts / 1000 . millivolts % 1000`.
 
 ---
 

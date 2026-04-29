@@ -58,12 +58,12 @@ Progress
 2026-02-24
 ----------
 - Implemented remote-control data stream (SRS-705: downlink config)
-  - Added node_config Supabase table: node_id (PK), sample_interval_ms INT DEFAULT 10000
-  - transport_fetch_config(): GET /rest/v1/node_config?node_id=eq.<IMEI>&select=sample_interval_ms
+  - Added node_config Supabase table: sample_interval_ms INT DEFAULT 10000
+  - transport_fetch_config(): GET /rest/v1/node_config?select=sample_interval_ms&limit=1
     - Parses JSON array response, validates range 1 s–1 hr, updates interval in place
     - No row found → leaves interval unchanged (safe default)
-  - transport_send_reading() now accepts node_id param, includes "node_id" field in JSON
-  - main.c: reads IMEI via AT+CGSN on startup, uses as node_id
+  - transport_send_reading() sends timestamp, accel, and battery fields
+  - main.c does not read or transmit device identity
   - main loop: POST → fetch_config → sleep(sample_interval_ms)
     → remote change takes effect within one cycle
   - Updated ARCHITECTURE.md: node_config schema, downlink endpoint, state machine
@@ -79,7 +79,105 @@ Progress
   - Config fetch remains best-effort (errors don't trigger reconnect)
   - Updated FIRMWARE.md POST loop description and ARCHITECTURE.md state machine
 
+2026-04-20
+----------
+- Resuming after 4-day field deployment died early (expected ~30 days per SC-1).
+  Diagnosis plan: extend charger telemetry (IBAT, VBUS, chg_state), then fix
+  duty cycle. One firmware change at a time, bench-verify after each.
+
+- F1 landed: power_read_current() via SENSOR_CHAN_GAUGE_AVG_CURRENT
+  - power.h: new decl with sign-convention docstring (+ = charging)
+  - power.c: new fn, ~15 lines. Converts sensor_value → mA via
+    (int64_t)val1*1e6 + val2, then /1000 — handles both Zephyr negative-value
+    conventions (val1=-1/val2=975000 and val1=0/val2=-25000).
+  - main.c: startup printk after existing Battery line. Prints N mA +
+    (charging|discharging) label.
+  - No prj.conf / overlay / transport / schema change. Purely additive.
+  - Build: clean. Flash 15%, RAM 36%.
+
+- Dev-loop pivot: USB-CDC via bridge → J-Link SWD + SEGGER RTT.
+  - Bridge chip got corrupted during recovery flashing; doesn't matter.
+  - prj.conf: CONFIG_UART_CONSOLE=n, CONFIG_USE_SEGGER_RTT=y,
+    CONFIG_RTT_CONSOLE=y.
+  - Flash via `nrfutil device program ... --traits jlink`.
+  - Serial via JLinkExe + JLinkRTTClient (port 19021).
+  - Discovered along the way: had to patch NCS
+    modules/hal/libmetal/libmetal/CMakeLists.txt and
+    modules/lib/open-amp/open-amp/CMakeLists.txt from
+    `cmake_minimum_required(VERSION 3.0.2)` to `3.5` for CMake 4.x.
+  - Also required `nrfutil device recover` (not just "erase all") to
+    clear a corrupted bootloader state on the nRF9151 — UICR/OTP didn't
+    clean up on plain erase, left chip spinning in b0 at PC=0x4D8.
+
+- F1.5: flip IBAT sign convention.
+  - Nordic nPM1300 driver returns POSITIVE for discharging, NEGATIVE for
+    charging (npm1300_charger.c:190-200 — full_scale_ma is negated in the
+    charge branches, not the discharge branch). Opposite of what the
+    initial plan and F1 code assumed.
+  - power.c: negate the returned value so firmware-external contract is
+    the intuitive "+ = charging, - = discharging". Comment explains WHY.
+  - main.c: added "idle" label for exact-zero case (float / COMPLETE).
+  - Bench-verified all three states: 0 mA (idle) w/ USB+full,
+    +N mA (charging) w/ USB+cell-below-float, -24 mA (discharging) on
+    battery alone.
+  - -24 mA on battery (LTE unattached) → ~45 hr autonomy, matches the
+    ~4 day field death when LTE was intermittently attaching. Duty-cycle
+    fix is the right lever, not a charger bug.
+
+- F2 landed: power_read_vbus() — direct I²C to nPM1300 VBUS_STATUS
+  (block 0x02 / offset 0x07, bit 0 = VBUSINPRESENT). Returns bool. No
+  sensor-API channel for VBUS voltage in NCS 2.9, so boolean presence is
+  the shape. Bench-verified against USB plug/unplug.
+
+- F3 landed: power_read_chg_state() — uses
+  SENSOR_CHAN_NPM1300_CHARGER_STATUS (driver already exposes the raw
+  BCHGCHARGESTATUS byte). No direct I²C needed. Bench-verified: 0x11 (CV)
+  on USB+full, 0x09 (CC) while actively charging, 0x00 on battery-alone.
+
+- S1 landed: node_status table in Supabase with generated chg_state_label
+  column decoding via CASE on bits. 0x00→IDLE, bit 7→SUPPLEMENT,
+  bit 6→THERMAL_LIMIT, bit 4→CV, bit 3→CC, bit 2→TRICKLE, bit 1→COMPLETE,
+  bit 5→RECHARGE_PENDING, bit 0→READY. Priority order surfaces the most
+  diagnostic active bit. Decode lives in DB, not firmware.
+
+- F4/F5/F6 landed as one bundle: transport_send_status() in transport.c
+  with mirror-of-send_reading pattern. main.c calls it once per batch
+  cycle with live ibat/vbus/chg_state reads. Status body ~108 bytes vs
+  accel ~11.7 KB — small overhead. Per-cycle: accel POST → HTTP 201,
+  status POST → HTTP 201, fetch_config. Stable for many cycles.
+
+- LTE diagnostic handler: state transitions, mode, RRC, cell ID logged
+  from lte_lc_register_handler. First cut included modem_info_get_rsrp
+  from handler callback + lte_lc_modem_events_enable; both caused
+  garbled RTT output (likely fault from AT-from-callback-thread). Dropped
+  both, kept static-struct-only reads. Clean now.
+
+- rest_client log level DBG → INF: removed ~7 lines/request of debug
+  spam from RTT, killed the "--- 1 messages dropped ---" log-buffer
+  overflows. Log is readable at a glance.
+
+- Power quirk: on battery-only, modem first-TX brownout-reset the nRF9151
+  repeatedly (chip reboot at "RRC=CONNECTED" with a cut-off "!" byte
+  pattern, likely fault trace truncated). Resolved by running on USB for
+  bench. Flag for field: under-voltage lockout behavior of nPM1300 +
+  cell IR under modem peak current is a real concern for 4-day-death
+  scenarios — another reason the duty-cycle fix is top priority.
+
+- Recover-on-every-reflash: each boot of our firmware re-enables nRF9151
+  APPROTECT via the TF-M / MCUboot chain. Every SWD reflash requires
+  `nrfutil device recover --traits jlink` first. Followup: find the
+  Kconfig that skips APPROTECT programming so dev loop doesn't need it.
+
 TODO
 ----
-- Add PSM sleep between POST cycles to reduce power consumption
+- Fuel gauge: nrf_fuel_gauge_process → soc_pct / tte_hr / ttf_hr
+- Duty-cycle fix: PSM + k_sleep(minutes), targets ~1–2 mA avg. Addresses
+  the root-cause 4-day death. First change in this arc that modifies
+  existing behavior rather than adds to it.
+- LTE quality-of-life: shorter attach timeout, wait-for-modem-ready
+  before AT+CCID/CIMI to eliminate 65536 noise, non-blocking attach
+  path so local dev doesn't stall on LTE.
+- APPROTECT lock bypass at build time (avoid recover dance).
+- Data efficiency: compact JSON (drop per-row keys) → ~4× reduction.
+  Longer term: MQTT migration → another 2–3× on top.
 - On-node FFT / feature extraction (future)
