@@ -207,17 +207,39 @@ int transport_send_batch(const struct accel_sample *samples, int count,
 	int pos = 0;
 
 	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos,
-			"{\"battery_pct\":%u,\"samples\":[",
+			"{\"battery_pct\":%u,\"x\":[",
 			battery_pct);
 
 	for (int i = 0; i < count; i++) {
 		pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos,
-			"%s[%d,%d,%d]",
-			i > 0 ? "," : "",
-			samples[i].x, samples[i].y, samples[i].z);
+			"%s%d", i > 0 ? "," : "", samples[i].x);
 
 		if (pos >= (int)sizeof(batch_buf) - 2) {
-			printk("batch_buf overflow at sample %d\n", i);
+			printk("batch_buf overflow at x sample %d\n", i);
+			return -ENOMEM;
+		}
+	}
+
+	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos, "],\"y\":[");
+
+	for (int i = 0; i < count; i++) {
+		pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos,
+			"%s%d", i > 0 ? "," : "", samples[i].y);
+
+		if (pos >= (int)sizeof(batch_buf) - 2) {
+			printk("batch_buf overflow at y sample %d\n", i);
+			return -ENOMEM;
+		}
+	}
+
+	pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos, "],\"z\":[");
+
+	for (int i = 0; i < count; i++) {
+		pos += snprintf(batch_buf + pos, sizeof(batch_buf) - pos,
+			"%s%d", i > 0 ? "," : "", samples[i].z);
+
+		if (pos >= (int)sizeof(batch_buf) - 2) {
+			printk("batch_buf overflow at z sample %d\n", i);
 			return -ENOMEM;
 		}
 	}

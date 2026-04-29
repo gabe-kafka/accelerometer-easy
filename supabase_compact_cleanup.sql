@@ -1,107 +1,85 @@
--- Compact production schema and prune retained data.
--- Run in the Supabase SQL editor. The anon REST key cannot delete these rows
--- because RLS blocks DELETE from the firmware/client role.
+-- Final compact production schema.
+--
+-- Firmware writes one row per 100-sample batch:
+--   battery_pct integer
+--   x/y/z smallint[] arrays
+--
+-- The accel_samples_25hz view expands batches into per-sample rows for charts.
 
 BEGIN;
 
--- Keep only the latest 100 accel samples by monotonically increasing id.
-WITH keep AS (
-  SELECT id
-  FROM public.accel_readings
-  ORDER BY id DESC
-  LIMIT 100
-)
-DELETE FROM public.accel_readings
-WHERE id NOT IN (SELECT id FROM keep);
+DROP VIEW IF EXISTS public.accel_samples_25hz;
 
--- Strip accel_readings to the columns the firmware now sends/stores:
--- id, ts, x, y, z.
-ALTER TABLE public.accel_readings
-  ALTER COLUMN ts SET DEFAULT now(),
-  DROP COLUMN IF EXISTS battery_v,
-  DROP COLUMN IF EXISTS node_id;
+-- The compact batch table replaces the old row-per-sample and status tables.
+DROP TABLE IF EXISTS public.accel_readings;
+DROP TABLE IF EXISTS public.node_status;
 
+CREATE TABLE IF NOT EXISTS public.accel_batches (
+  id BIGSERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  battery_pct INTEGER,
+  x SMALLINT[],
+  y SMALLINT[],
+  z SMALLINT[]
+);
+
+ALTER TABLE public.accel_batches
+  ADD COLUMN IF NOT EXISTS battery_pct INTEGER,
+  ADD COLUMN IF NOT EXISTS x SMALLINT[],
+  ADD COLUMN IF NOT EXISTS y SMALLINT[],
+  ADD COLUMN IF NOT EXISTS z SMALLINT[],
+  DROP COLUMN IF EXISTS sample_count,
+  DROP COLUMN IF EXISTS start_uptime_ms,
+  DROP COLUMN IF EXISTS end_uptime_ms;
+
+-- One-time upgrade from the previous samples JSONB column, if present.
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'accel_readings'
-      AND column_name = 'x_raw'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'accel_readings'
-      AND column_name = 'x'
+      AND table_name = 'accel_batches'
+      AND column_name = 'samples'
   ) THEN
-    ALTER TABLE public.accel_readings RENAME COLUMN x_raw TO x;
-  END IF;
+    EXECUTE $sql$
+      UPDATE public.accel_batches b
+      SET
+        x = parsed.x,
+        y = parsed.y,
+        z = parsed.z
+      FROM (
+        SELECT
+          id,
+          array_agg((sample_value->>0)::smallint ORDER BY sample_ord) AS x,
+          array_agg((sample_value->>1)::smallint ORDER BY sample_ord) AS y,
+          array_agg((sample_value->>2)::smallint ORDER BY sample_ord) AS z
+        FROM public.accel_batches
+        CROSS JOIN LATERAL jsonb_array_elements(samples) WITH ORDINALITY
+          AS sample(sample_value, sample_ord)
+        WHERE samples IS NOT NULL
+          AND x IS NULL
+        GROUP BY id
+      ) parsed
+      WHERE b.id = parsed.id
+    $sql$;
 
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'accel_readings'
-      AND column_name = 'y_raw'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'accel_readings'
-      AND column_name = 'y'
-  ) THEN
-    ALTER TABLE public.accel_readings RENAME COLUMN y_raw TO y;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'accel_readings'
-      AND column_name = 'z_raw'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'accel_readings'
-      AND column_name = 'z'
-  ) THEN
-    ALTER TABLE public.accel_readings RENAME COLUMN z_raw TO z;
+    ALTER TABLE public.accel_batches DROP COLUMN samples;
   END IF;
 END $$;
 
--- Status telemetry was useful during charger debug, but it is extra storage
--- and an extra POST path. Keep charger state in RTT logs for now.
-DROP TABLE IF EXISTS public.node_status;
-
--- One row per uploaded 100-sample batch. The firmware stores battery_pct once
--- per batch and keeps raw accel samples packed as compact JSON arrays.
-CREATE TABLE IF NOT EXISTS public.accel_batches (
-  id BIGSERIAL PRIMARY KEY,
-  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
-  samples JSONB NOT NULL,
-  battery_pct INTEGER
-);
-
 ALTER TABLE public.accel_batches
-  ADD COLUMN IF NOT EXISTS battery_pct INTEGER,
-  DROP COLUMN IF EXISTS sample_count,
-  DROP COLUMN IF EXISTS start_uptime_ms,
-  DROP COLUMN IF EXISTS end_uptime_ms;
+  ALTER COLUMN x SET NOT NULL,
+  ALTER COLUMN y SET NOT NULL,
+  ALTER COLUMN z SET NOT NULL;
 
--- Display/analysis view: expand each compact JSON batch into one row per
--- sample with synthetic 25 Hz timestamps. Large gaps start new segments so
--- outages remain visible instead of being smoothed away.
 CREATE OR REPLACE VIEW public.accel_samples_25hz AS
-WITH ordered_batches AS (
+WITH batches AS (
   SELECT
     id AS batch_id,
     ts AS batch_ts,
     battery_pct,
-    samples,
-    jsonb_array_length(samples) AS sample_count,
+    cardinality(x) AS sample_count,
     CASE
       WHEN lag(ts) OVER (ORDER BY id) IS NULL THEN 1
       WHEN ts - lag(ts) OVER (ORDER BY id) > interval '15 seconds' THEN 1
@@ -113,7 +91,7 @@ segmented_batches AS (
   SELECT
     *,
     sum(segment_start) OVER (ORDER BY batch_id) AS segment_id
-  FROM ordered_batches
+  FROM batches
 ),
 indexed_batches AS (
   SELECT
@@ -130,22 +108,21 @@ indexed_batches AS (
   FROM segmented_batches
 )
 SELECT
-  batch_id,
-  segment_id,
-  segment_sample_offset + sample_ord - 1 AS sample_index,
-  sample_ord AS sample_in_batch,
-  segment_anchor_ts
-    + ((segment_sample_offset + sample_ord - 1) * interval '40 milliseconds')
+  b.batch_id,
+  b.segment_id,
+  b.segment_sample_offset + p.sample_ord - 1 AS sample_index,
+  p.sample_ord AS sample_in_batch,
+  b.segment_anchor_ts
+    + ((b.segment_sample_offset + p.sample_ord - 1) * interval '40 milliseconds')
     AS sample_ts,
-  batch_ts,
-  battery_pct,
-  (sample_value->>0)::integer AS x,
-  (sample_value->>1)::integer AS y,
-  (sample_value->>2)::integer AS z
-FROM indexed_batches
-CROSS JOIN LATERAL jsonb_array_elements(samples) WITH ORDINALITY
-  AS sample(sample_value, sample_ord);
+  b.batch_ts,
+  b.battery_pct,
+  p.x,
+  p.y,
+  p.z
+FROM indexed_batches b
+JOIN public.accel_batches raw ON raw.id = b.batch_id
+CROSS JOIN LATERAL unnest(raw.x, raw.y, raw.z) WITH ORDINALITY
+  AS p(x, y, z, sample_ord);
 
 COMMIT;
-
-VACUUM (ANALYZE) public.accel_readings;
