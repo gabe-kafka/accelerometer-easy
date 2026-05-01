@@ -2,4 +2,10 @@ build/
 firmware/build/
 .DS_Store
 .env
+.env.local
 .claude/
+node_modules/
+dist/
+.vercel/
+*.local
+*.tsbuildinfo

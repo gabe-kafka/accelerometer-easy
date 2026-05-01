@@ -1,0 +1,102 @@
+.live-charts {
+  padding: 0 16px 32px;
+}
+
+.live-charts__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.live-charts__heading {
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.live-charts__status {
+  font-size: 0.786rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-charts__pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.live-charts__loading {
+  color: var(--muted);
+  font-size: 0.857rem;
+}
+
+.live-charts__section {
+  margin-bottom: 24px;
+}
+
+.live-charts__label {
+  font-size: 0.786rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.live-charts__chart-wrapper {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px 8px 8px;
+}
+
+.live-charts__cal-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 24px;
+  font-size: 0.786rem;
+}
+
+.live-charts__cal-mode {
+  font-weight: 600;
+  color: var(--blue);
+  letter-spacing: 0.04em;
+}
+
+.live-charts__cal-info {
+  color: var(--muted);
+}
+
+.live-charts__cal-reset {
+  margin-left: auto;
+  padding: 2px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.786rem;
+}
+
+.live-charts__cal-reset:hover {
+  border-color: var(--muted);
+}

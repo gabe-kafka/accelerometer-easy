@@ -1,0 +1,79 @@
+.fleet-dashboard__heading {
+  font-size: 0.857rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.fleet-dashboard__loading {
+  color: var(--muted);
+  font-size: 0.857rem;
+}
+
+.fleet-dashboard__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  border: 1px solid var(--border);
+  background: var(--border);
+  margin-bottom: 24px;
+}
+
+.fleet-dashboard__card {
+  background: var(--surface);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fleet-dashboard__label {
+  font-size: 0.714rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fleet-dashboard__value {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.fleet-dashboard__value--small {
+  font-size: 0.786rem;
+  line-height: 1.8;
+}
+
+.fleet-dashboard__latest {
+  margin-top: 8px;
+}
+
+.fleet-dashboard__latest .fleet-dashboard__label {
+  margin-bottom: 8px;
+  display: block;
+}
+
+.fleet-dashboard__table {
+  border: 1px solid var(--border);
+}
+
+.fleet-dashboard__table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 0.786rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.fleet-dashboard__table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.857rem;
+}

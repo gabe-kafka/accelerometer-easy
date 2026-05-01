@@ -1,0 +1,129 @@
+.explorer__heading {
+  font-size: 0.857rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.explorer__filters {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.explorer__filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.explorer__filter-label {
+  font-size: 0.786rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.explorer__filter select,
+.explorer__filter input {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
+.explorer__table {
+  border: 1px solid var(--border);
+}
+
+.explorer__table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 0.786rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.explorer__sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.explorer__sortable:hover {
+  color: var(--text);
+}
+
+.explorer__table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.857rem;
+}
+
+.explorer__row {
+  cursor: pointer;
+}
+
+.explorer__row:hover {
+  background: var(--surface);
+}
+
+.explorer__row--expanded {
+  background: var(--surface);
+}
+
+.explorer__detail-row td {
+  background: var(--surface);
+  padding: 0;
+}
+
+.explorer__detail {
+  padding: 12px 12px 12px 24px;
+  font-size: 0.786rem;
+  color: var(--muted);
+  border-left: 2px solid var(--border);
+  margin: 0 12px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.explorer__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+  font-size: 0.786rem;
+  color: var(--muted);
+}
+
+.explorer__pagination button {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+}
+
+.explorer__pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.explorer__pagination button:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.explorer__loading,
+.explorer__empty {
+  color: var(--muted);
+  font-size: 0.857rem;
+  text-align: center;
+  padding: 24px 12px;
+}

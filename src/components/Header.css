@@ -1,0 +1,39 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.header__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.05em;
+}
+
+.header__title:hover {
+  text-decoration: none;
+}
+
+.header__nav {
+  display: flex;
+  gap: 24px;
+}
+
+.header__link {
+  color: var(--muted);
+  font-size: 0.857rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.header__link--active {
+  color: var(--blue);
+}
+
+.header__link:hover {
+  color: var(--text);
+  text-decoration: none;
+}
