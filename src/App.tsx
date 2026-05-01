@@ -8,6 +8,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
 
 const SAMPLE_LIMIT = 100_000;
 const SUPABASE_PAGE_SIZE = 500;
+const SUPABASE_RPC_PAGE_SIZE = 1000;
 const PLOT_POINT_LIMIT = 10_000;
 const BIG_SAMPLE_TARGET = 10_000;
 const SAMPLES_TABLE = 'accel_batches';
@@ -199,15 +200,26 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 async function fetchDownsampledFullHistory(target = BIG_SAMPLE_TARGET) {
   if (!supabaseUrl) throw new Error('Supabase URL is not configured.');
+  if (!supabaseAnonKey) throw new Error('Supabase URL or anon key is not configured.');
 
   const url = new URL('/rest/v1/rpc/big_sample_summary', supabaseUrl);
-  const rows = await fetchJson<BigSampleSummaryRow[]>(url.toString(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ target_points: target }),
-  });
+  const rows: BigSampleSummaryRow[] = [];
+
+  while (rows.length < target) {
+    url.searchParams.set('limit', String(SUPABASE_RPC_PAGE_SIZE));
+    url.searchParams.set('offset', String(rows.length));
+
+    const page = await fetchJson<BigSampleSummaryRow[]>(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ target_points: target }),
+    });
+
+    rows.push(...page);
+    if (page.length < SUPABASE_RPC_PAGE_SIZE) break;
+  }
 
   const readings = rows.map((row) => ({
     ts: row.ts,
@@ -974,14 +986,34 @@ function BigSampleViewerShell() {
       }) satisfies Record<AxisKey, number[]>,
     [bigReadings],
   );
-  const bigBatteryPercentSeries = useMemo(
-    () => bigReadings.map((reading) => reading.batteryPct ?? 0),
+  const bigBatteryReadings = useMemo(
+    () =>
+      bigReadings.filter(
+        (reading): reading is AccelReading & { batteryPct: number } =>
+          reading.batteryPct !== null,
+      ),
     [bigReadings],
   );
+  const bigBatteryPercentSeries = useMemo(
+    () => bigBatteryReadings.map((reading) => reading.batteryPct),
+    [bigBatteryReadings],
+  );
+  const bigBatteryTimestamps = useMemo(
+    () => bigBatteryReadings.map((reading) => reading.ts),
+    [bigBatteryReadings],
+  );
   const bigLatest = bigReadings[bigReadings.length - 1];
+  const bigLatestBattery = bigBatteryReadings[bigBatteryReadings.length - 1];
   const bigPlotTimeDomain =
     bigReadings.length > 0
       ? { start: bigReadings[0]!.ts, end: bigReadings[bigReadings.length - 1]!.ts }
+      : null;
+  const bigBatteryPlotTimeDomain =
+    bigBatteryTimestamps.length > 0
+      ? {
+          start: bigBatteryTimestamps[0]!,
+          end: bigBatteryTimestamps[bigBatteryTimestamps.length - 1]!,
+        }
       : null;
 
   return (
@@ -1095,7 +1127,11 @@ function BigSampleViewerShell() {
       <section className="raw-panel" aria-label="Full-history battery data">
         <button className="raw-panel__toggle" type="button" aria-expanded="true">
           <span>Collapse battery</span>
-          <span>{bigReadings.length ? `${bigReadings.length.toLocaleString()} samples` : '0 samples'}</span>
+          <span>
+            {bigBatteryPercentSeries.length
+              ? `${bigBatteryPercentSeries.length.toLocaleString()} samples`
+              : '0 samples'}
+          </span>
         </button>
         <div className="raw-panel__body">
           <div className="summary">
@@ -1103,19 +1139,19 @@ function BigSampleViewerShell() {
             <span>Percent samples: {bigBatteryPercentSeries.length.toLocaleString()}</span>
             <span>
               Latest battery:{' '}
-              {bigLatest?.batteryPct === null || bigLatest?.batteryPct === undefined
+              {bigLatestBattery?.batteryPct === null || bigLatestBattery?.batteryPct === undefined
                 ? 'none'
-                : `${compactNumber(bigLatest.batteryPct)}%`}
+                : `${compactNumber(bigLatestBattery.batteryPct)}%`}
             </span>
           </div>
           <div className="plots">
-            {bigReadings.length > 0 ? (
+            {bigBatteryPercentSeries.length > 0 ? (
               <AxisPlot
                 label="Battery"
                 stroke="#0f766e"
-                timestamps={bigTimestamps}
+                timestamps={bigBatteryTimestamps}
                 values={bigBatteryPercentSeries}
-                xDomain={bigPlotTimeDomain}
+                xDomain={bigBatteryPlotTimeDomain}
                 yDomain={[0, 100]}
                 yTicks={[0, 50, 100]}
                 valueSuffix="%"
