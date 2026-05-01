@@ -12,6 +12,8 @@ const PLOT_POINT_LIMIT = 10_000;
 const BIG_SAMPLE_TARGET = 10_000;
 const SAMPLES_TABLE = 'accel_batches';
 const SAMPLE_INTERVAL_MS = 40;
+const TIMELINE_CORRECTION_INTERVAL_MS = 2 * 60 * 1000;
+const TIMELINE_DRIFT_THRESHOLD_MS = 2 * 1000;
 const POLL_INTERVAL_MS = 12_000;
 
 type AxisKey = 'x' | 'y' | 'z';
@@ -103,10 +105,30 @@ function buildSupabaseBatchesUrl(startIso: string, endIso: string, offset: numbe
 }
 
 function expandBatchRows(batches: AccelBatchRow[]): AccelReading[] {
-  return batches.flatMap((batch) => {
+  const readings: AccelReading[] = [];
+  let nextSampleMs: number | null = null;
+  let lastCorrectionCheckMs: number | null = null;
+
+  batches.forEach((batch) => {
     const sampleCount = Math.min(batch.x.length, batch.y.length, batch.z.length);
-    const batchStartMs = new Date(batch.ts).getTime();
-    const readings: AccelReading[] = [];
+    const observedBatchMs = new Date(batch.ts).getTime();
+    if (!Number.isFinite(observedBatchMs) || sampleCount === 0) return;
+
+    if (nextSampleMs === null) {
+      nextSampleMs = observedBatchMs;
+      lastCorrectionCheckMs = observedBatchMs;
+    } else if (
+      lastCorrectionCheckMs === null ||
+      observedBatchMs - lastCorrectionCheckMs >= TIMELINE_CORRECTION_INTERVAL_MS
+    ) {
+      const driftMs = observedBatchMs - nextSampleMs;
+      if (Math.abs(driftMs) > TIMELINE_DRIFT_THRESHOLD_MS) {
+        nextSampleMs = observedBatchMs;
+      }
+      lastCorrectionCheckMs = observedBatchMs;
+    }
+
+    const batchStartMs = nextSampleMs;
 
     for (let index = 0; index < sampleCount; index += 1) {
       readings.push({
@@ -119,8 +141,10 @@ function expandBatchRows(batches: AccelBatchRow[]): AccelReading[] {
       });
     }
 
-    return readings;
+    nextSampleMs = batchStartMs + sampleCount * SAMPLE_INTERVAL_MS;
   });
+
+  return readings;
 }
 
 async function fetchReadingsFromBatches(startIso: string, endIso: string) {
