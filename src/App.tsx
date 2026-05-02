@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, PointerEvent, WheelEvent } from 'react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -70,6 +70,11 @@ interface AxisPlotProps {
 
 type IntervalUnit = 'minutes' | 'hours';
 type IndexRange = { start: number; end: number };
+type FetchReadingsOptions = {
+  intervalAmount?: string;
+  intervalUnit?: IntervalUnit;
+  resetAnalysis?: boolean;
+};
 
 interface BigSampleSummaryRow {
   bucket_index: number;
@@ -1175,6 +1180,8 @@ export function App() {
   const [batteryExpanded, setBatteryExpanded] = useState(false);
   const [intervalAmount, setIntervalAmount] = useState('5');
   const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>('minutes');
+  const [appliedIntervalAmount, setAppliedIntervalAmount] = useState('5');
+  const [appliedIntervalUnit, setAppliedIntervalUnit] = useState<IntervalUnit>('minutes');
   const [windowStart, setWindowStart] = useState<string | null>(null);
   const [windowEnd, setWindowEnd] = useState<string | null>(null);
   const [readings, setReadings] = useState<AccelReading[]>([]);
@@ -1190,12 +1197,15 @@ export function App() {
   const [batteryZoomRange, setBatteryZoomRange] = useState<IndexRange | null>(null);
   const [inclinometerScrubEnabled, setInclinometerScrubEnabled] = useState(false);
   const [inclinometerScrubIndex, setInclinometerScrubIndex] = useState<number | null>(null);
+  const hasLoadedReadingsRef = useRef(false);
 
-  const fetchReadings = useCallback(async () => {
-    const parsedAmount = Number.parseFloat(intervalAmount);
+  const fetchReadings = useCallback(async (options: FetchReadingsOptions = {}) => {
+    const nextIntervalAmount = options.intervalAmount ?? appliedIntervalAmount;
+    const nextIntervalUnit = options.intervalUnit ?? appliedIntervalUnit;
+    const parsedAmount = Number.parseFloat(nextIntervalAmount);
     const safeAmount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
     const intervalMs =
-      safeAmount * (intervalUnit === 'hours' ? 60 * 60 * 1000 : 60 * 1000);
+      safeAmount * (nextIntervalUnit === 'hours' ? 60 * 60 * 1000 : 60 * 1000);
 
     if (!supabaseUrl || !supabaseAnonKey) {
       setError('Supabase URL or anon key is not configured.');
@@ -1212,14 +1222,18 @@ export function App() {
         start.toISOString(),
         end.toISOString(),
       );
+      const shouldResetAnalysis = options.resetAnalysis || !hasLoadedReadingsRef.current;
       setReadings(readingsFromSamples);
-      setCalibrationStart(0);
-      setCalibrationEnd(Math.max(readingsFromSamples.length - 1, 0));
-      setRawZoomRange(null);
-      setNormalizedZoomRange(null);
-      setInclinometerZoomRange(null);
-      setBatteryZoomRange(null);
-      setInclinometerScrubIndex(null);
+      if (shouldResetAnalysis) {
+        setCalibrationStart(0);
+        setCalibrationEnd(Math.max(readingsFromSamples.length - 1, 0));
+        setRawZoomRange(null);
+        setNormalizedZoomRange(null);
+        setInclinometerZoomRange(null);
+        setBatteryZoomRange(null);
+        setInclinometerScrubIndex(null);
+      }
+      hasLoadedReadingsRef.current = true;
       setWindowStart(start.toISOString());
       setWindowEnd(end.toISOString());
     } catch {
@@ -1227,10 +1241,11 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  }, [intervalAmount, intervalUnit]);
+  }, [appliedIntervalAmount, appliedIntervalUnit]);
 
   useEffect(() => {
     if (viewerMode !== 'small') return;
+    if (hasLoadedReadingsRef.current) return;
 
     void fetchReadings();
   }, [fetchReadings, viewerMode]);
@@ -1238,9 +1253,15 @@ export function App() {
   const handleIntervalSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      void fetchReadings();
+      setAppliedIntervalAmount(intervalAmount);
+      setAppliedIntervalUnit(intervalUnit);
+      void fetchReadings({
+        intervalAmount,
+        intervalUnit,
+        resetAnalysis: true,
+      });
     },
-    [fetchReadings],
+    [fetchReadings, intervalAmount, intervalUnit],
   );
 
   const toggleExpanded = useCallback(() => {
@@ -1310,7 +1331,7 @@ export function App() {
   );
 
   const latest = readings[readings.length - 1];
-  const intervalLabel = formatInterval(intervalAmount, intervalUnit);
+  const intervalLabel = formatInterval(appliedIntervalAmount, appliedIntervalUnit);
   const plotTimeDomain =
     windowStart && windowEnd ? { start: windowStart, end: windowEnd } : null;
   const maxCalibrationIndex = Math.max(readings.length - 1, 0);
