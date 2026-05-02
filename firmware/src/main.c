@@ -59,17 +59,22 @@ static void lte_handler(const struct lte_lc_evt *const evt)
 #define ADXL367_FIFO_CONTROL   0x28u
 #define ADXL367_FILTER_CTL     0x2Cu
 #define ADXL367_POWER_CTL      0x2Du
+#define ADXL367_ADC_CTL        0x3Cu
 
 /* FIFO + ODR config */
 #define FIFO_MODE_STREAM       0x02u
 #define FILTER_25HZ_2G         0x01u  /* ±2g, 25 Hz ODR */
 #define POWER_MEAS             0x02u
+#define FIFO_14BIT_CHAN_ID     0xC0u
 
 /* Batch sizing */
 #define BATCH_SAMPLES          100
 #define FIFO_MAX_SETS          170   /* 512 FIFO entries / 3 axes */
 #define FIFO_RAW_BUF_SIZE      (FIFO_MAX_SETS * 6)
-#define FIFO_DRAIN_MS          2000
+#define FIFO_DRAIN_MS          500
+#define SAMPLE_QUEUE_LEN       4096  /* ~164 seconds at 25 Hz */
+#define SAMPLE_THREAD_STACK    2048
+#define SAMPLE_THREAD_PRIORITY 3
 #define CHARGE_POLICY_TICK_MS  60000
 
 /* I2C bus + address from device tree (ADXL367 @ 0x1d on I2C2) */
@@ -124,8 +129,12 @@ static int read_accel_raw(int16_t *x, int16_t *y, int16_t *z)
 
 /* FIFO buffers */
 static struct accel_sample batch[BATCH_SAMPLES];
-static int batch_pos;
+static struct accel_sample drain_buf[FIFO_MAX_SETS];
 static uint8_t fifo_raw[FIFO_RAW_BUF_SIZE];
+static struct k_thread sample_thread_data;
+static K_THREAD_STACK_DEFINE(sample_thread_stack, SAMPLE_THREAD_STACK);
+K_MSGQ_DEFINE(sample_queue, sizeof(struct accel_sample), SAMPLE_QUEUE_LEN, 4);
+static atomic_t dropped_samples;
 
 static int adxl367_fifo_init(void)
 {
@@ -138,6 +147,9 @@ static int adxl367_fifo_init(void)
 	ret = i2c_reg_write_byte_dt(&accel_i2c, ADXL367_FILTER_CTL, FILTER_25HZ_2G);
 	if (ret) { printk("ADXL367: ODR failed: %d\n", ret); return ret; }
 
+	ret = i2c_reg_write_byte_dt(&accel_i2c, ADXL367_ADC_CTL, FIFO_14BIT_CHAN_ID);
+	if (ret) { printk("ADXL367: FIFO format failed: %d\n", ret); return ret; }
+
 	ret = i2c_reg_write_byte_dt(&accel_i2c, ADXL367_FIFO_CONTROL, FIFO_MODE_STREAM);
 	if (ret) { printk("ADXL367: FIFO failed: %d\n", ret); return ret; }
 
@@ -148,10 +160,33 @@ static int adxl367_fifo_init(void)
 	return 0;
 }
 
+static int16_t sign_extend_14(uint16_t raw)
+{
+	raw &= 0x3FFF;
+	if (raw & BIT(13)) {
+		raw |= 0xC000;
+	}
+	return (int16_t)raw;
+}
+
+static void decode_fifo_word(const uint8_t *raw, uint8_t *channel, int16_t *value)
+{
+	uint16_t word = ((uint16_t)raw[0] << 8) | raw[1];
+
+	*channel = word >> 14;
+	*value = sign_extend_14(word);
+}
+
 static int adxl367_drain_fifo(struct accel_sample *buf, int max_samples)
 {
 	uint8_t eh, el;
 	int ret;
+	struct accel_sample pending = { 0 };
+	bool have_x = false;
+	bool have_y = false;
+	int out = 0;
+
+	if (max_samples <= 0) return 0;
 
 	ret = i2c_reg_read_byte_dt(&accel_i2c, ADXL367_FIFO_ENTRIES_H, &eh);
 	if (ret) return ret;
@@ -159,26 +194,85 @@ static int adxl367_drain_fifo(struct accel_sample *buf, int max_samples)
 	if (ret) return ret;
 
 	uint16_t entries = ((uint16_t)(eh & 0x03) << 8) | el;
-	int complete = entries / 3;
-	if (complete == 0) return 0;
-	if (complete > max_samples) complete = max_samples;
-	if (complete > FIFO_MAX_SETS) complete = FIFO_MAX_SETS;
+	if (entries < 3) return 0;
+
+	int read_entries = entries;
+	int target_entries = (max_samples * 3) + 2;
+	if (read_entries > target_entries) read_entries = target_entries;
+	if (read_entries > FIFO_RAW_BUF_SIZE / 2) read_entries = FIFO_RAW_BUF_SIZE / 2;
 
 	ret = i2c_burst_read_dt(&accel_i2c, ADXL367_I2C_FIFO_DATA,
-				fifo_raw, complete * 6);
+				fifo_raw, read_entries * 2);
 	if (ret) return ret;
 
-	for (int i = 0; i < complete; i++) {
-		int b = i * 6;
-		int16_t x = (int16_t)(((fifo_raw[b+0] & 0x3F) << 8) | fifo_raw[b+1]);
-		if (x & 0x2000) x |= 0xC000;
-		int16_t y = (int16_t)(((fifo_raw[b+2] & 0x3F) << 8) | fifo_raw[b+3]);
-		if (y & 0x2000) y |= 0xC000;
-		int16_t z = (int16_t)(((fifo_raw[b+4] & 0x3F) << 8) | fifo_raw[b+5]);
-		if (z & 0x2000) z |= 0xC000;
-		buf[i].x = x; buf[i].y = y; buf[i].z = z;
+	for (int i = 0; i < read_entries && out < max_samples; i++) {
+		uint8_t channel;
+		int16_t value;
+
+		decode_fifo_word(&fifo_raw[i * 2], &channel, &value);
+
+		switch (channel) {
+		case 0:
+			pending.x = value;
+			have_x = true;
+			have_y = false;
+			break;
+		case 1:
+			if (have_x) {
+				pending.y = value;
+				have_y = true;
+			}
+			break;
+		case 2:
+			if (have_x && have_y) {
+				pending.z = value;
+				buf[out++] = pending;
+				have_x = false;
+				have_y = false;
+			}
+			break;
+		default:
+			have_x = false;
+			have_y = false;
+			break;
+		}
 	}
-	return complete;
+
+	return out;
+}
+
+static void queue_sample(const struct accel_sample *sample)
+{
+	while (k_msgq_put(&sample_queue, sample, K_NO_WAIT) != 0) {
+		struct accel_sample discarded;
+
+		if (k_msgq_get(&sample_queue, &discarded, K_NO_WAIT) != 0) {
+			break;
+		}
+		atomic_inc(&dropped_samples);
+	}
+}
+
+static void sample_thread(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+
+	while (1) {
+		int n = adxl367_drain_fifo(drain_buf, ARRAY_SIZE(drain_buf));
+
+		if (n > 0) {
+			for (int i = 0; i < n; i++) {
+				queue_sample(&drain_buf[i]);
+			}
+			printk("FIFO: +%d queued=%u dropped=%ld\n",
+			       n, k_msgq_num_used_get(&sample_queue),
+			       atomic_get(&dropped_samples));
+		}
+
+		k_msleep(FIFO_DRAIN_MS);
+	}
 }
 
 static int modem_connect(void)
@@ -372,7 +466,12 @@ int main(void)
 	/* --- FIFO batch loop --- */
 	printk("\n--- FIFO 25 Hz continuous -> batch of %d -> Supabase ---\n",
 	       BATCH_SAMPLES);
-	batch_pos = 0;
+	k_thread_create(&sample_thread_data, sample_thread_stack,
+			K_THREAD_STACK_SIZEOF(sample_thread_stack),
+			sample_thread, NULL, NULL, NULL,
+			SAMPLE_THREAD_PRIORITY, 0, K_NO_WAIT);
+
+	int batch_pos = 0;
 	int64_t last_charge_tick = k_uptime_get();
 
 	while (1) {
@@ -381,12 +480,9 @@ int main(void)
 			last_charge_tick = k_uptime_get();
 		}
 
-		int n = adxl367_drain_fifo(batch + batch_pos,
-					   BATCH_SAMPLES - batch_pos);
-		if (n > 0) {
-			batch_pos += n;
-			printk("FIFO: +%d (%d/%d)\n",
-			       n, batch_pos, BATCH_SAMPLES);
+		while (batch_pos < BATCH_SAMPLES &&
+		       k_msgq_get(&sample_queue, &batch[batch_pos], K_NO_WAIT) == 0) {
+			batch_pos++;
 		}
 
 		if (batch_pos >= BATCH_SAMPLES) {
@@ -413,7 +509,7 @@ int main(void)
 
 		}
 
-		k_msleep(FIFO_DRAIN_MS);
+		k_msleep(100);
 	}
 
 	return 0;

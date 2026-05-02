@@ -154,19 +154,62 @@ At ±2g range: 1 LSB = 250 µg → ~4000 counts = 1g.
 ## Build + Flash
 
 ```bash
-# Activate NCS virtual environment
-source ~/ncs-venv/bin/activate
+# From repo root
+cd ~/projects/accelerometer-easy
 
-# Build (from NCS workspace)
-cd ~/ncs
-west build -b thingy91x/nrf9151/ns -p always ~/projects/accelerometer-easy/firmware
+# Build the full sysbuild image
+cmake --build build
 
-# Flash via MCUboot DFU (device connected via USB)
-nrfutil device program --firmware ~/ncs/build/dfu_application.zip --serial-number <SERIAL>
-
-# Monitor serial output
-screen /dev/tty.usbmodem102 115200
+# The firmware/TF-M/MCUboot chain re-enables APPROTECT.
+# If programming fails with "Application core access port is protected",
+# recover first, then program the full merged image.
+nrfutil device recover --family nrf91 --serial-number <SERIAL>
+nrfutil device program --firmware build/merged.hex --serial-number <SERIAL>
+nrfutil device reset --reset-kind RESET_PIN --serial-number <SERIAL>
 ```
+
+### Two-Terminal SWD + RTT Dev Loop
+
+Use this when the device is already flashed and you just need to reset/run and
+watch logs.
+
+Terminal 1 holds the J-Link SWD connection:
+
+```bash
+JLinkExe -USB <SERIAL> -device nRF9151_xxCA -if SWD -speed 4000 -autoconnect 1
+```
+
+At the `J-Link>` prompt:
+
+```text
+r
+g
+```
+
+Terminal 2 monitors RTT logs:
+
+```bash
+JLinkRTTClient
+```
+
+Expected boot/upload markers:
+
+```text
+=== Thingy:91 X
+Connecting to LTE network
+Connected to LTE!
+HTTP 201
+dropped=0
+```
+
+Notes:
+
+- SEGGER's correct device name for the Thingy:91 X nRF9151 target is
+  `nRF9151_xxCA`.
+- Use `-USB <SERIAL>` with `JLinkExe`; `-select USB=...` is not accepted by the
+  installed J-Link Commander version.
+- Keep other J-Link/RTT sessions closed while flashing, otherwise the probe may
+  be held by another process.
 
 ---
 

@@ -15,7 +15,6 @@ const SAMPLES_TABLE = 'accel_batches';
 const SAMPLE_INTERVAL_MS = 40;
 const TIMELINE_CORRECTION_INTERVAL_MS = 2 * 60 * 1000;
 const TIMELINE_DRIFT_THRESHOLD_MS = 2 * 1000;
-const POLL_INTERVAL_MS = 12_000;
 
 type AxisKey = 'x' | 'y' | 'z';
 type Vector3 = { x: number; y: number; z: number };
@@ -1234,11 +1233,6 @@ export function App() {
     if (viewerMode !== 'small') return;
 
     void fetchReadings();
-    const intervalId = window.setInterval(() => {
-      void fetchReadings();
-    }, POLL_INTERVAL_MS);
-
-    return () => window.clearInterval(intervalId);
   }, [fetchReadings, viewerMode]);
 
   const handleIntervalSubmit = useCallback(

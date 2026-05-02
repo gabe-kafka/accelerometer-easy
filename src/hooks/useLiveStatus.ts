@@ -3,8 +3,6 @@ import { NodeStatusRow } from '../types';
 import { supabase } from '../lib/supabase';
 import { COLLECTION_START_ISO } from '../lib/time';
 
-const POLL_INTERVAL = 12_000;
-
 export interface LiveStatusResult {
   rows: NodeStatusRow[];
   latest: NodeStatusRow | null;
@@ -20,7 +18,6 @@ export function useLiveStatus(): LiveStatusResult {
   const [rows, setRows] = useState<NodeStatusRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastTsRef = useRef<string | null>(null);
   const lastCountRef = useRef<number>(0);
 
@@ -58,10 +55,6 @@ export function useLiveStatus(): LiveStatusResult {
 
   useEffect(() => {
     fetchStatus();
-    intervalRef.current = setInterval(fetchStatus, POLL_INTERVAL);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
   }, [fetchStatus]);
 
   const latest: NodeStatusRow | null = rows[rows.length - 1] ?? null;

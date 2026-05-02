@@ -165,19 +165,13 @@ Progress
 
 - Recover-on-every-reflash: each boot of our firmware re-enables nRF9151
   APPROTECT via the TF-M / MCUboot chain. Every SWD reflash requires
-  `nrfutil device recover --traits jlink` first. Followup: find the
-  Kconfig that skips APPROTECT programming so dev loop doesn't need it.
+  `nrfutil device recover --family nrf91` first, followed by programming
+  `build/merged.hex`.
 
-TODO
-----
-- Fuel gauge: nrf_fuel_gauge_process → soc_pct / tte_hr / ttf_hr
-- Duty-cycle fix: PSM + k_sleep(minutes), targets ~1–2 mA avg. Addresses
-  the root-cause 4-day death. First change in this arc that modifies
-  existing behavior rather than adds to it.
-- LTE quality-of-life: shorter attach timeout, wait-for-modem-ready
-  before AT+CCID/CIMI to eliminate 65536 noise, non-blocking attach
-  path so local dev doesn't stall on LTE.
-- APPROTECT lock bypass at build time (avoid recover dance).
-- Data efficiency: compact JSON (drop per-row keys) → ~4× reduction.
-  Longer term: MQTT migration → another 2–3× on top.
-- On-node FFT / feature extraction (future)
+NEXT FIRMWARE UPDATE TODO
+-------------------------
+- Add sample-continuity metadata to each `accel_batches` row:
+  `batch_seq`, `sample_seq_start`, `sample_count`, and `dropped_samples`.
+  RTT confirmed the RAM queue preserves samples during LTE reconnects
+  (`dropped=0`), but Supabase currently only sees upload timestamps, so DB
+  gaps cannot independently prove continuous sample time.

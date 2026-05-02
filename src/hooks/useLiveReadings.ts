@@ -3,8 +3,6 @@ import { AccelReading } from '../types';
 import { supabase } from '../lib/supabase';
 import { COLLECTION_START_ISO } from '../lib/time';
 
-const POLL_INTERVAL = 12_000;
-
 export interface LiveReadingsResult {
   readings: AccelReading[];
   loading: boolean;
@@ -20,7 +18,6 @@ export function useLiveReadings(): LiveReadingsResult {
   const [readings, setReadings] = useState<AccelReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastTsRef = useRef<string | null>(null);
 
   const lastCountRef = useRef<number>(0);
@@ -62,10 +59,6 @@ export function useLiveReadings(): LiveReadingsResult {
 
   useEffect(() => {
     fetchReadings();
-    intervalRef.current = setInterval(fetchReadings, POLL_INTERVAL);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
   }, [fetchReadings]);
 
   return { readings, loading, lastUpdated };

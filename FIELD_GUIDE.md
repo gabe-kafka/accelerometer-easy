@@ -208,7 +208,9 @@ Same as Phase 1 §2.3. Additionally:
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| Firmware flashes OK but zero serial output | Slide switch in nRF53 position — USB serial routed to BLE chip, not LTE chip | Move slide switch to nRF91 position, press reset. Flashing still works in either position. |
+| Firmware flashes OK but zero serial output | Slide switch in nRF53 position, or RTT monitor not attached through J-Link | Move slide switch to nRF91. Start `JLinkExe -USB <SERIAL> -device nRF9151_xxCA -if SWD -speed 4000 -autoconnect 1`, then run `r` and `g`; monitor with `JLinkRTTClient`. |
+| J-Link says unknown option/device | Wrong local SEGGER syntax or wrong nRF9151 device name | Use `-USB <SERIAL>`, not `-select USB=...`; use `nRF9151_xxCA`, not `NRF9151_XXAA`. |
+| Reflash fails with access port protected / APPROTECT | Firmware/TF-M/MCUboot chain re-enabled readback protection | Close all J-Link/RTT sessions, power-cycle if needed, run `nrfutil device recover --family nrf91 --serial-number <SERIAL>`, then program `build/merged.hex`. |
 | No packets for > 2 hr | PSM timer stuck / modem crash | Wait for watchdog reset (30 sec). If persists > 6 hr, power cycle. |
 | Packet received but peaks all < 0.1 mg | ADXL367 in standby / SPI fault | Reflash firmware. Check onboard SPI bus via RTT debug. |
 | Battery dropping despite solar | Panel disconnected or shaded | Check cable gland, verify panel orientation. |
