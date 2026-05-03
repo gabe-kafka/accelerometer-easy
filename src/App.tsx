@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { FormEvent, PointerEvent, WheelEvent } from 'react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -973,10 +973,6 @@ function BigSampleViewerShell() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadFullHistory();
-  }, [loadFullHistory]);
-
   const bigTimestamps = useMemo(
     () => bigReadings.map((reading) => reading.ts),
     [bigReadings],
@@ -1242,13 +1238,6 @@ export function App() {
       setLoading(false);
     }
   }, [appliedIntervalAmount, appliedIntervalUnit]);
-
-  useEffect(() => {
-    if (viewerMode !== 'small') return;
-    if (hasLoadedReadingsRef.current) return;
-
-    void fetchReadings();
-  }, [fetchReadings, viewerMode]);
 
   const handleIntervalSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
