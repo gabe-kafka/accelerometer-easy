@@ -1,0 +1,1 @@
+During this test, the reference sensor showed little up-down motion on the Y/up-down channel (LORD ch1 std=0.067 g), while the two active motion axes were much stronger (LORD ch2 std=0.270 g, LORD ch3 std=0.217 g). After empirical calibration, the prototype matched the active axes with correlations of 0.698 and 0.697.
