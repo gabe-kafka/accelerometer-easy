@@ -48,7 +48,10 @@ Platform:       Nordic Thingy:91 X — $126.25
 Accelerometer:  ADXL367 (onboard Thingy:91 X)
                   200 µg/√Hz noise, 14-bit, ±2/4/8g, I2C
                   Built-in — no external wiring required
-Power:          Onboard LiPo + 2W external solar panel
+Power:          Onboard 1350 mAh LiPo + external solar front end:
+                  2W panel → BQ24074 charger/load-share →
+                  S7V8F5 buck-boost → regulated 5V USB-C
+                  External 10Ah LiPo buffer for overnight/storm reserve
 Enclosure:      Stock Thingy:91 (Phase 1), IP67 upgrade (Phase 2)
 ```
 
@@ -125,6 +128,7 @@ OQ-5  NYU IP constraints on thesis hardware/software?
 PRD.md  ← you are here
 ├── SRS.md            Numbered testable requirements
 ├── ARCHITECTURE.md   Block diagram, interfaces
+├── HARDWARE_SPEC.md  Reproducible research-grade hardware spec
 ├── POWER_BUDGET.md   Current draw by state, autonomy
 ├── BOM.md            Part numbers, costs, justifications
 ├── FIRMWARE.md       State machine, data flow

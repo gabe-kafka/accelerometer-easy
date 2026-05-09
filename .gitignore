@@ -9,3 +9,5 @@ dist/
 .vercel/
 *.local
 *.tsbuildinfo
+~$*.docx
+.$*.drawio.bkp

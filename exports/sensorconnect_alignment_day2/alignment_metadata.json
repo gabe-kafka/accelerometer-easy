@@ -1,0 +1,55 @@
+{
+  "method": "dynamic magnitude, 1-second moving-average high-pass, normalized cross-correlation; score cropped by 0.5s at each edge",
+  "source_sensorconnect_csv": "/Users/gabe/Downloads/SensorConnectData-day2.csv",
+  "source_thingy_csv": "/Users/gabe/projects/accelerometer-easy/exports/raw_accel_2026-05-04_1809-1811_ET.csv",
+  "sensor_rows": 3900,
+  "sensor_start_utc": "2026-05-04T22:12:08.507812512+00:00",
+  "sensor_end_utc": "2026-05-04T22:12:38.968750+00:00",
+  "sensor_duration_s": 30.460937488,
+  "thingy_cut_rows": 761,
+  "thingy_aligned_start_utc": "2026-05-04T22:13:09.931875+00:00",
+  "thingy_aligned_end_utc": "2026-05-04T22:13:40.392812488+00:00",
+  "best_correlation": 0.7345141118521233,
+  "top_candidates": [
+    {
+      "correlation": 0.7345141118521233,
+      "thingy_offset_s": 69.921875,
+      "thingy_start_utc": "2026-05-04T22:13:09.931875+00:00"
+    },
+    {
+      "correlation": 0.728485362048084,
+      "thingy_offset_s": 69.9140625,
+      "thingy_start_utc": "2026-05-04T22:13:09.924062500+00:00"
+    },
+    {
+      "correlation": 0.7250670173664976,
+      "thingy_offset_s": 69.9296875,
+      "thingy_start_utc": "2026-05-04T22:13:09.939687500+00:00"
+    },
+    {
+      "correlation": 0.7147279999290995,
+      "thingy_offset_s": 8.515625,
+      "thingy_start_utc": "2026-05-04T22:12:08.525625+00:00"
+    },
+    {
+      "correlation": 0.708335782396894,
+      "thingy_offset_s": 8.5078125,
+      "thingy_start_utc": "2026-05-04T22:12:08.517812500+00:00"
+    },
+    {
+      "correlation": 0.707698523673207,
+      "thingy_offset_s": 69.90625,
+      "thingy_start_utc": "2026-05-04T22:13:09.916250+00:00"
+    },
+    {
+      "correlation": 0.7070703652199899,
+      "thingy_offset_s": 8.625,
+      "thingy_start_utc": "2026-05-04T22:12:08.635000+00:00"
+    },
+    {
+      "correlation": 0.7061951965579026,
+      "thingy_offset_s": 8.6328125,
+      "thingy_start_utc": "2026-05-04T22:12:08.642812500+00:00"
+    }
+  ]
+}

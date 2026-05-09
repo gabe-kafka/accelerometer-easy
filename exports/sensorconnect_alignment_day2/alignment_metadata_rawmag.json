@@ -1,0 +1,92 @@
+{
+  "method": "raw vector magnitude normalized cross-correlation; no smoothing and no high-pass filtering",
+  "source_sensorconnect_csv": "/Users/gabe/Downloads/SensorConnectData-day2.csv",
+  "source_thingy_csv": "/Users/gabe/projects/accelerometer-easy/exports/raw_accel_2026-05-04_1809-1811_ET.csv",
+  "sensor_rows": 3900,
+  "sensor_start_utc": "2026-05-04T22:12:08.507812512+00:00",
+  "sensor_end_utc": "2026-05-04T22:12:38.968750+00:00",
+  "sensor_duration_s": 30.460937488,
+  "thingy_cut_rows": 761,
+  "thingy_aligned_start_utc": "2026-05-04T22:13:09.931875+00:00",
+  "thingy_aligned_end_utc": "2026-05-04T22:13:40.392812488+00:00",
+  "best_correlation": 0.9385322101396405,
+  "sensor_peak_relative_s_first_20": [
+    5.625,
+    5.835938,
+    6.054688,
+    6.28125,
+    6.507812,
+    6.734375,
+    6.960938,
+    7.179688,
+    7.40625,
+    7.632812,
+    7.851562,
+    8.078125,
+    8.296875,
+    8.523438,
+    8.75,
+    8.976562,
+    9.421875
+  ],
+  "thingy_peak_relative_s_first_20": [
+    4.953125,
+    5.4375,
+    5.804688,
+    6.078125,
+    6.28125,
+    6.515625,
+    6.71875,
+    6.960938,
+    7.195312,
+    7.398438,
+    7.640625,
+    7.875,
+    8.078125,
+    8.523438,
+    8.992188,
+    9.4375
+  ],
+  "top_candidates": [
+    {
+      "correlation": 0.9385322101396405,
+      "thingy_offset_s": 69.921875,
+      "thingy_start_utc": "2026-05-04T22:13:09.931875+00:00"
+    },
+    {
+      "correlation": 0.9326879578998939,
+      "thingy_offset_s": 69.9296875,
+      "thingy_start_utc": "2026-05-04T22:13:09.939687500+00:00"
+    },
+    {
+      "correlation": 0.9275684438048811,
+      "thingy_offset_s": 69.9140625,
+      "thingy_start_utc": "2026-05-04T22:13:09.924062500+00:00"
+    },
+    {
+      "correlation": 0.909877161701654,
+      "thingy_offset_s": 69.9375,
+      "thingy_start_utc": "2026-05-04T22:13:09.947500+00:00"
+    },
+    {
+      "correlation": 0.9004721811096318,
+      "thingy_offset_s": 69.90625,
+      "thingy_start_utc": "2026-05-04T22:13:09.916250+00:00"
+    },
+    {
+      "correlation": 0.8889883546595547,
+      "thingy_offset_s": 8.515625,
+      "thingy_start_utc": "2026-05-04T22:12:08.525625+00:00"
+    },
+    {
+      "correlation": 0.8883848606882903,
+      "thingy_offset_s": 8.5078125,
+      "thingy_start_utc": "2026-05-04T22:12:08.517812500+00:00"
+    },
+    {
+      "correlation": 0.8815024255890258,
+      "thingy_offset_s": 69.703125,
+      "thingy_start_utc": "2026-05-04T22:13:09.713125+00:00"
+    }
+  ]
+}

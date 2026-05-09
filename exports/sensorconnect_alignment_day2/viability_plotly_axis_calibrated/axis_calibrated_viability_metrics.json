@@ -1,0 +1,49 @@
+{
+  "alignment_source": "/Users/gabe/projects/accelerometer-easy/exports/sensorconnect_alignment_day2/sensorconnect_day2_thingy_peak_aligned_30s_rawmag.csv",
+  "calibration_model": "Lord axes g = [thingy_x_raw, thingy_y_raw, thingy_z_raw, 1] @ B; magnitude computed after axis calibration",
+  "calibration_matrix_B_rows_x_y_z_bias_cols_lord_ch1_ch2_ch3": [
+    [
+      0.00022669147113541681,
+      0.00021602529608117589,
+      9.270367731981294e-05
+    ],
+    [
+      -0.00010382192455469506,
+      0.00019695989649625293,
+      3.28826166792659e-05
+    ],
+    [
+      -1.8731606807973302e-05,
+      -1.678603176414781e-05,
+      0.0002558281173076436
+    ],
+    [
+      0.07577683726575177,
+      -0.49268947307841154,
+      -0.31275832392564507
+    ]
+  ],
+  "axis_rmse_g": [
+    0.019165769976683757,
+    0.0424677732792044,
+    0.14298309671315904
+  ],
+  "axis_pearson_correlation": [
+    0.7953885155759199,
+    0.7853081292376661,
+    0.925309815466433
+  ],
+  "magnitude_rmse_g": 0.040082354693569563,
+  "magnitude_mean_bias_g": -0.008883323054326337,
+  "magnitude_pearson_correlation": 0.9547289030345686,
+  "magnitude_normalized_rmse_by_lord_range": 0.03814526792504196,
+  "magnitude_normalized_rmse_by_lord_rms": 0.037676502669797114,
+  "fft_frequency_range_hz": [
+    0,
+    12.5
+  ],
+  "fft_amplitude_correlation_0_to_12_5_hz": 0.9515578634329892,
+  "fft_amplitude_rmse_g_0_to_12_5_hz": 0.002579358454907123,
+  "sample_count": 3900,
+  "duration_s": 30.460937488
+}

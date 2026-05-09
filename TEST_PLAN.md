@@ -47,7 +47,8 @@
 | T1-20 | 406 | Measure sleep current | PPK2 | ≤ 50 µA |
 | T1-21 | 403 | Measure full 1-hr duty cycle avg | PPK2 | ≤ 5 mA |
 | T1-22 | 407 | Drain battery to 3.0V | Bench PSU | System shuts down cleanly |
-| T1-23 | 401 | Charge from solar panel input | 2W panel | Battery charges, no thermal issues |
+| T1-23 | 409–410 | Charge external buffer from solar input | 2W panel + BQ24074 | External battery charges, no thermal issues |
+| T1-24 | 411–412 | Sweep BQ24074 LOAD/OUT range from 3.0–4.4V into S7V8F5 | Bench PSU + DMM | S7V8F5 output remains 5.0V ± 5%; Thingy USB never sees raw load rail |
 
 ---
 
@@ -75,7 +76,7 @@
 | T3-03 | SC-3 | Pipeline end-to-end | 72 hr | All 72 hourly packets in DB |
 | T3-04 | SC-4 | Survive rain event (natural or hose test) | 1 hr | No data corruption, no reset |
 | T3-05 | 601–602 | Tap test at mount point | — | Mount resonance ≥ 200 Hz (verify with impact hammer or FFT of tap) |
-| T3-06 | — | Battery trend over 72 hr | 72 hr | Voltage curve matches POWER_BUDGET.md prediction |
+| T3-06 | — | Power trend over 72 hr | 72 hr | Thingy VBUS stays present, internal battery remains healthy, external front-end behavior matches POWER_BUDGET.md prediction |
 | T3-07 | — | RSSI stability | 72 hr | No sustained dropout > 30 min |
 
 ---
@@ -87,7 +88,7 @@
 | T4-01 | Node powered on after shipping | Heartbeat received within 1 hr |
 | T4-02 | Mount on tower, verify coupling | Tap test shows clean impulse response |
 | T4-03 | 24-hr soak after install | 24 consecutive hourly packets, no anomalies |
-| T4-04 | Solar charging under PR conditions | Battery trending up during daylight hours |
+| T4-04 | Solar charging under PR conditions | BQ24074 charges external buffer during daylight; S7V8F5 holds 5.0V USB output |
 
 ---
 
@@ -96,8 +97,10 @@
 | Item | For tests | Own / buy |
 |------|-----------|-----------|
 | Nordic PPK2 | T1-20, T1-21 | Buy ($99) or borrow from NYU lab |
+| Bench PSU | T1-22, T1-24 | Borrow from lab |
 | Bench shaker or tuning fork | T1-10, T1-11 | Borrow from lab |
-| Multimeter | T1-05, T1-22 | Own |
+| Multimeter | T1-05, T1-22, T1-24 | Own |
+| 2W panel + BQ24074 + S7V8F5 | T1-23, T1-24, T4-04 | Buy / assemble |
 | Garden hose + nozzle | T3-04 | Available |
 | Impact hammer (or heavy bolt) | T3-05 | Improvise — bolt on string works |
 | Laptop + J-Link | All T1/T2 | Own |
@@ -107,6 +110,6 @@
 ## Doc Chain
 
 ```
-PRD → SRS → ARCHITECTURE → POWER_BUDGET → BOM → FIRMWARE → TEST_PLAN  ← you are here
-                                                             └── FIELD_GUIDE.md
+PRD → SRS → ARCHITECTURE → HARDWARE_SPEC → POWER_BUDGET → BOM → FIRMWARE → TEST_PLAN  ← you are here
+                                                                             └── FIELD_GUIDE.md
 ```

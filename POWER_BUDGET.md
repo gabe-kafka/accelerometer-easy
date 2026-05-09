@@ -5,17 +5,48 @@
 
 ---
 
-## Battery
+## Energy Storage
 
-| Parameter | Value | Source |
-|-----------|-------|--------|
-| Chemistry | Li-ion polymer | Thingy:91 onboard |
-| Capacity | 1350 mAh (nominal) | Nordic datasheet |
-| Usable capacity | 1080 mAh (80%) | Derate for aging + cutoff |
-| Nominal voltage | 3.7V | — |
-| Full charge | 4.2V | — |
-| Cutoff | 3.0V (SRS-407) | nPM1300 PMIC threshold |
-| Energy (usable) | 4.0 Wh | 1080 mAh × 3.7V |
+The node now has two energy buffers:
+
+1. The stock Thingy:91 X 1350 mAh LiPo, monitored by the onboard nPM1300 PMIC.
+2. An external 10Ah LiPo buffer managed by a BQ24074 solar charger/load-share
+   board and regulated to the Thingy USB-C input through an S7V8F5 buck-boost.
+
+Firmware telemetry (`battery_v`, `battery_pct`, `ibat`, `vbus`, and charge
+state) describes the **Thingy internal battery and USB input**, not the external
+10Ah buffer directly.
+
+| Parameter | Thingy internal battery | External buffer battery | Source / note |
+|-----------|-------------------------|--------------------------|---------------|
+| Chemistry | Li-ion polymer | Li-ion polymer | Thingy onboard / external pack |
+| Capacity | 1350 mAh nominal | 10,000 mAh nominal | Nordic datasheet / selected field buffer |
+| Usable capacity | 1080 mAh (80%) | 8000 mAh (80%) | Derate for aging + cutoff |
+| Nominal voltage | 3.7V | 3.7V | — |
+| Full charge | 4.2V | 4.2V | — |
+| Cutoff | 3.0V | ~3.0V | nPM1300 / BQ24074 battery range |
+| Energy usable | 4.0 Wh | 29.6 Wh | usable Ah × 3.7V |
+
+## External Power Path
+
+```
+solar panel → BQ24074 charger/load-share → S7V8F5 buck-boost → USB-C → Thingy:91 X
+             ↘ external 10Ah LiPo buffer                         stock 1350 mAh LiPo
+```
+
+The BQ24074 LOAD/OUT node is intentionally treated as a non-USB rail. Adafruit
+documents it at roughly 3.0-4.4V, which is below USB 5V and may track the LiPo
+battery when input power is absent. The S7V8F5 is therefore used to hold the
+Thingy USB-C input at 5.0V in all operating conditions.
+
+| Node | Expected voltage | Design implication |
+|------|------------------|--------------------|
+| Solar panel | ~6.0-7.0V in sun | Feeds BQ24074 VBUS input. |
+| BQ24074 LOAD/OUT | ~3.0-4.4V | Load rail for a 3.3V regulator or 5V converter; do not feed Thingy USB-C directly. |
+| S7V8F5 OUT | 5.0V regulated | Safe Thingy USB-C input. |
+| Thingy internal battery | ~3.0-4.2V | Local ride-through and telemetry source. |
+
+Voltage trace figure: `public/diagrams/thingy91x-voltage-trace.svg`
 
 ---
 
@@ -133,6 +164,8 @@ Includes modem wake, RRC connection setup, MQTT publish, ACK, and RRC release. A
 
 ## Autonomy — Battery Only
 
+### Thingy Internal Battery Only
+
 ```
 Usable capacity:     1,080 mAh
 Average current:     1.07 mA
@@ -153,6 +186,36 @@ SRS-404  ✓  by 4.7×
 SRS-405  ✓  by 2.4×
 ```
 
+### External 10Ah Buffer, Duty-Cycled Firmware
+
+Using the same duty-cycled load model and treating the 10Ah pack as the primary
+field energy reservoir:
+
+```
+Usable external energy:    8.0 Ah × 3.7V = 29.6 Wh
+Daily consumption:         95.0 mWh/day
+Ideal autonomy:            29.6 / 0.095 = 311 days
+With 80% conversion margin: ~249 days
+```
+
+### Current Continuous-Post Firmware
+
+The current raw-stream firmware is not yet duty-cycled. With LTE activity every
+10 seconds, the practical average draw is closer to the continuous model in
+ARCHITECTURE.md.
+
+```
+Approx USB-side load:      ~20 mA at 5V ≈ 100 mW
+Daily consumption:         ~2.4 Wh/day
+External 10Ah autonomy:    29.6 / 2.4 ≈ 12 days ideal
+With 80% conversion margin: ~10 days
+Internal-only autonomy:    ~2.3 days
+```
+
+This is why the report should separate **solar/battery feasibility of the final
+duty-cycled architecture** from **the observed limitation of the current
+continuous-post firmware**.
+
 ---
 
 ## Autonomy — Battery + Solar
@@ -162,12 +225,12 @@ SRS-405  ✓  by 2.4×
 | Parameter | Value | Source |
 |-----------|-------|--------|
 | Panel rating | 2W (peak) | Spec |
-| Panel voltage | 5.5V open, ~5V operating | Typical |
+| Panel voltage | ~6.0-7.0V open/full sun | Voltage trace |
 | PR solar irradiance | 5.5 kWh/m²/day (annual avg) | NREL |
 | Panel area | ~80 cm² (100 × 80 mm) | Typical 2W panel |
 | Panel efficiency | ~18% | Monocrystalline |
 | Daily harvest (ideal) | 2W × 5.5 hr = 11 Wh | Peak sun hours |
-| Charge efficiency | ~70% (panel → battery via PMIC) | nPM1300 losses |
+| Charge + regulation efficiency | ~70% | BQ24074 charge path + S7V8F5 conversion + wiring losses |
 | **Net daily harvest** | **~7.7 Wh** | After losses |
 
 ### Daily Consumption
@@ -191,8 +254,8 @@ The system is overwhelmingly solar-positive. Even with 90% cloud cover reducing 
 
 ```
 Energy needed:       0.1 Wh/day × 5 days = 0.5 Wh
-Battery available:   4.0 Wh
-Margin:              8× — node survives easily
+External buffer:     29.6 Wh usable
+Margin:              59× — node survives easily under duty-cycled firmware
 ```
 
 ---
@@ -246,6 +309,7 @@ Before field deployment, validate these numbers with a Nordic PPK2:
 
 ```
 PRD.md → SRS.md → ARCHITECTURE.md → POWER_BUDGET.md  ← you are here
+                                     ├── HARDWARE_SPEC.md
                                      ├── BOM.md
                                      ├── FIRMWARE.md
                                      ├── TEST_PLAN.md

@@ -175,3 +175,17 @@ NEXT FIRMWARE UPDATE TODO
   RTT confirmed the RAM queue preserves samples during LTE reconnects
   (`dropped=0`), but Supabase currently only sees upload timestamps, so DB
   gaps cannot independently prove continuous sample time.
+
+2026-05-08
+----------
+- Updated hardware/power spec from `thingy91x-voltage-trace.svg`.
+  - Final field power chain: 2W solar panel → BQ24074 charger/load-share →
+    Pololu S7V8F5 buck-boost → regulated 5V USB-C → Thingy:91 X.
+  - External 10Ah LiPo is the primary overnight/storm buffer; stock Thingy
+    1350 mAh LiPo remains installed as local ride-through.
+  - Important telemetry caveat: firmware battery readings come from the
+    Thingy internal nPM1300/stock LiPo domain, not the external 10Ah buffer.
+  - S7V8F5 remains the baseline regulator. BQ24074 LOAD/OUT is roughly
+    3.0-4.4V, not USB 5V, and must be converted to safe 5.0V before
+    Thingy USB-C. A boost-only substitution requires a wiring proof that its
+    input cannot ever be solar/VBUS.

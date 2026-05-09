@@ -10,11 +10,23 @@
 ```
                          ┌──────────────────────────────────────┐
                          │         SOLAR (2W panel)             │
-                         │         5.5V open circuit            │
+                         │         ~6.0-7.0V in sun             │
                          └──────────┬───────────────────────────┘
-                                    │ Voc
+                                    │ VBUS
+                         ┌──────────▼───────────────────────────┐
+                         │  BQ24074 solar LiPo charger          │
+                         │  LOAD/OUT = ~3.0-4.4V, not USB 5V    │
+                         │  LIPO = external 10Ah buffer battery │
+                         └──────────┬───────────────────────────┘
+                                    │ LOAD/OUT
+                         ┌──────────▼───────────────────────────┐
+                         │  Pololu S7V8F5 buck-boost regulator  │
+                         │  VIN 2.7-11.8V → regulated 5.0V      │
+                         └──────────┬───────────────────────────┘
+                                    │ cut USB-A→C cable, 5V/GND
                          ┌──────────▼───────────────────────────┐
                          │  THINGY:91 X                         │
+                         │  USB-C VBUS = regulated 5.0V         │
                          │                                      │
                          │  ┌─────────────┐   ┌──────────────┐ │
                          │  │  nRF9151    │   │  nRF5340     │ │
@@ -24,8 +36,8 @@
                          │  │  1MB flash  │   ┌──────────────┐ │
                          │  │  256KB RAM  │   │  nPM1300     │ │
                          │  │             │   │  PMIC        │ │
-                         │  │  I2C master │   │  LiPo 1350   │ │
-                         │  │  GPIO       │   │  mAh         │ │
+                         │  │  I2C master │   │  stock LiPo  │ │
+                         │  │  GPIO       │   │  1350 mAh    │ │
                          │  │             │   └──────────────┘ │
                          │  │  LTE-M      │                    │
                          │  │  modem      │───► LTE-M antenna  │
@@ -46,6 +58,9 @@
                          │  ─► Frontend dashboard               │
                          └──────────────────────────────────────┘
 ```
+
+Final report hardware figure: `public/diagrams/final-hardware-architecture.svg`
+Internal voltage trace reference: `public/diagrams/thingy91x-voltage-trace.svg`
 
 ---
 
@@ -95,6 +110,28 @@ Readings transmit over LTE-M via HTTPS POST to Supabase REST API. The POST inter
 
 The system is continuously active (no sleep/wake duty cycle in current firmware). Power consumption is dominated by the LTE-M modem.
 
+The field power path is now an external solar/battery front end that feeds the
+Thingy:91 X through USB-C at a regulated 5.0V:
+
+```
+solar panel → BQ24074 charger/load-share → S7V8F5 buck-boost → USB-C → Thingy:91 X
+             ↘ external 10Ah LiPo buffer                         stock 1350 mAh LiPo
+```
+
+The BQ24074 charges the external LiPo buffer and load-shares between solar and
+the buffer battery. Its LOAD/OUT pin is documented by Adafruit as roughly
+3.0-4.4V: suitable for a 3.3V regulator or 5V converter, but not a direct USB
+5V rail. The S7V8F5 is therefore placed between BQ24074 LOAD/OUT and the
+Thingy USB-C input to present a verified 5.0V rail to the Thingy. A boost-only
+regulator is only acceptable if the wiring is proven to keep its input on the
+BQ24074 LOAD/OUT rail and never on the solar/VBUS input rail.
+
+Important telemetry caveat: firmware battery voltage/current/charge-state
+readings come from the Thingy:91 X internal nPM1300 and stock 1350 mAh LiPo.
+They confirm whether the Thingy sees 5V USB input and whether the internal
+battery is charging, but they do not directly measure the external 10Ah buffer
+battery state of charge.
+
 **Continuous operation (10-sec POST cycle):**
 
 | Component | Current | Notes |
@@ -105,14 +142,17 @@ The system is continuously active (no sleep/wake duty cycle in current firmware)
 | LTE-M TX (burst every 10s) | ~50 mA peak | ~3.5 sec per POST |
 | **Estimated average** | **~20 mA** | **Continuous** |
 
-**Autonomy (battery only, no solar):**
+**Autonomy (Thingy internal battery only, no external front end):**
 ```
 Battery:    1350 mAh × 0.8 usable = 1080 mAh
 Avg draw:   ~20 mA
 Runtime:    ~54 hr ≈ 2.3 days
 ```
 
-**With solar:** Indefinite operation in PR conditions (same surplus as original design).
+**With external solar/battery front end:** The Thingy sees regulated USB-C
+power whenever the BQ24074/S7V8F5 chain is energized. The external 10Ah buffer
+becomes the primary nighttime/storm reserve, while the stock Thingy battery is a
+local ride-through buffer.
 
 **Future:** Adding PSM sleep between POST cycles would dramatically reduce average current.
 
@@ -128,7 +168,7 @@ Runtime:    ~54 hr ≈ 2.3 days
 | Sensor | ADXL367 onboard — no modifications | ADXL367 onboard — Thingy:91 X PCB bolted inside enclosure |
 | Mount | Hose clamp or U-bolt | 316 SS L-bracket, 2× M6 bolts |
 | Antenna | Onboard (plastic shell is RF-transparent) | External LTE-M patch if metal enclosure |
-| Cable entry | N/A | IP67 gland for solar panel lead |
+| Cable entry | USB-C power lead, solar lead to charger | IP67 glands for solar panel and regulated USB-C power lead |
 
 **Coupling path:** Structural member → bracket → enclosure wall → Thingy:91 X PCB → ADXL367.
 Total compliance must keep **mount first resonance ≥ 200 Hz** (SRS-602).
@@ -216,6 +256,7 @@ CREATE TABLE node_config (
 | D-7 | NCS rest_client over raw sockets | Handles DNS, TLS setup, HTTP framing automatically |
 | D-8 | Store battery_v only in DB, derive % in frontend | Voltage is ground truth — percentage is a display concern |
 | D-9 | Modem-offloaded TLS over app-side MbedTLS | nRF9151 modem handles TLS natively, saves RAM and complexity |
+| D-10 | S7V8F5 buck-boost between BQ24074 LOAD/OUT and Thingy USB-C | BQ24074 LOAD/OUT is not USB 5V; S7V8F5 keeps Thingy input at 5.0V across full sun, dusk, and battery-only conditions |
 
 ---
 
@@ -223,6 +264,7 @@ CREATE TABLE node_config (
 
 ```
 PRD.md → SRS.md → ARCHITECTURE.md  ← you are here
+                  ├── HARDWARE_SPEC.md
                   ├── POWER_BUDGET.md
                   ├── BOM.md
                   ├── FIRMWARE.md

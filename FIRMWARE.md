@@ -134,6 +134,16 @@ power_read_battery(int32_t *voltage_mv, uint8_t *pct):
   Read SENSOR_CHAN_GAUGE_STATE_OF_CHARGE → percentage (0–100)
 ```
 
+These readings describe the Thingy:91 X internal nPM1300/stock LiPo domain. In
+the updated field power architecture, the external solar front end is:
+
+```
+solar → BQ24074 charger/load-share → S7V8F5 buck-boost → 5V USB-C → Thingy
+```
+
+`power_read_vbus()` confirms the Thingy sees regulated USB input, but firmware
+does not directly measure the external 10Ah buffer battery state of charge.
+
 ---
 
 ## JSON Payload
@@ -271,7 +281,7 @@ CONFIG_MAIN_STACK_SIZE=16384
 ## Doc Chain
 
 ```
-PRD.md → SRS.md → ARCHITECTURE.md → POWER_BUDGET.md → BOM.md → FIRMWARE.md  ← you are here
-                                                                 ├── TEST_PLAN.md
-                                                                 └── FIELD_GUIDE.md
+PRD.md → SRS.md → ARCHITECTURE.md → HARDWARE_SPEC.md → POWER_BUDGET.md → BOM.md → FIRMWARE.md  ← you are here
+                                                                                   ├── TEST_PLAN.md
+                                                                                   └── FIELD_GUIDE.md
 ```

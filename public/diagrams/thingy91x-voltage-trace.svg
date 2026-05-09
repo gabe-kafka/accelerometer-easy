@@ -1,0 +1,286 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="960" viewBox="0 0 1400 960">
+  <defs>
+    <style>
+      .bg { fill: #0A0A0A; }
+      .surface { fill: #141414; stroke: #2A2A2A; stroke-width: 1; }
+      .grid { stroke: #1A1A1A; stroke-width: 1; }
+      .divider { stroke: #2A2A2A; stroke-width: 1; }
+      .mono-label { font: 600 9px 'JetBrains Mono', 'IBM Plex Mono', monospace; letter-spacing: 1.2px; text-transform: uppercase; fill: #808080; }
+      .mono-title { font: 700 18px 'JetBrains Mono', 'IBM Plex Mono', monospace; fill: #E5E5E5; }
+      .mono-body { font: 500 12px 'JetBrains Mono', 'IBM Plex Mono', monospace; fill: #E5E5E5; }
+      .mono-dim { font: 500 11px 'JetBrains Mono', 'IBM Plex Mono', monospace; fill: #666666; }
+      .mono-blue { font: 600 12px 'JetBrains Mono', 'IBM Plex Mono', monospace; fill: #3B82F6; }
+      .mono-green { font: 600 12px 'JetBrains Mono', 'IBM Plex Mono', monospace; fill: #16A34A; }
+      .mono-red { font: 600 12px 'JetBrains Mono', 'IBM Plex Mono', monospace; fill: #DC2626; }
+      .mono-amber { font: 600 12px 'JetBrains Mono', 'IBM Plex Mono', monospace; fill: #D97706; }
+      .wire-text { font: 600 11px 'JetBrains Mono', 'IBM Plex Mono', monospace; }
+      .num { font-variant-numeric: tabular-nums; }
+      .wire-red { fill: none; stroke: #DC2626; stroke-width: 3; stroke-linecap: square; }
+      .wire-green { fill: none; stroke: #16A34A; stroke-width: 3; stroke-linecap: square; }
+      .wire-black-track { fill: none; stroke: #505050; stroke-width: 6; stroke-linecap: square; }
+      .wire-black { fill: none; stroke: #0A0A0A; stroke-width: 3; stroke-linecap: square; }
+      .wire-blue { fill: none; stroke: #3B82F6; stroke-width: 2; stroke-dasharray: 6 6; }
+      .dot-green { fill: #16A34A; }
+      .dot-cyan { fill: #06B6D4; }
+      .dot-amber { fill: #D97706; }
+      .warn-box { fill: #111111; stroke: #DC2626; stroke-width: 1; }
+      .good-box { fill: #111111; stroke: #16A34A; stroke-width: 1; }
+      .v-high { font: 700 13px 'JetBrains Mono', monospace; fill: #DC2626; }
+      .v-ok { font: 700 13px 'JetBrains Mono', monospace; fill: #16A34A; }
+      .v-mid { font: 700 13px 'JetBrains Mono', monospace; fill: #D97706; }
+      .v-dim { font: 700 13px 'JetBrains Mono', monospace; fill: #666666; }
+      .col-head { font: 700 11px 'JetBrains Mono', monospace; fill: #E5E5E5; letter-spacing: 0.5px; }
+      .row-head { font: 600 11px 'JetBrains Mono', monospace; fill: #A0A0A0; }
+      .cell { font: 500 12px 'JetBrains Mono', monospace; fill: #E5E5E5; }
+      .cell-green { font: 600 12px 'JetBrains Mono', monospace; fill: #16A34A; }
+      .cell-red { font: 600 12px 'JetBrains Mono', monospace; fill: #DC2626; }
+      .cell-amber { font: 600 12px 'JetBrains Mono', monospace; fill: #D97706; }
+      .cell-dim { font: 500 12px 'JetBrains Mono', monospace; fill: #555555; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="960"/>
+
+  <!-- Header bar -->
+  <g>
+    <rect class="surface" x="0" y="0" width="1400" height="28"/>
+    <circle class="dot-green" cx="18" cy="14" r="4"/>
+    <circle class="dot-cyan" cx="34" cy="14" r="4"/>
+    <circle class="dot-amber" cx="50" cy="14" r="4"/>
+    <text class="mono-label" x="68" y="18">thingy:91x voltage trace / rev 7 / regulated usb architecture / 2026-05-08</text>
+    <text class="mono-dim num" x="820" y="18">solar -> bq24074 -> load/out -> s7v8f5 -> 5.0v -> usb-c -> thingy</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION 1: Signal chain with voltage nodes  -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g>
+    <text class="mono-label" x="72" y="56">signal chain — voltage at each node</text>
+    <rect class="surface" x="64" y="64" width="1272" height="160" rx="2"/>
+
+    <!-- Solar Panel -->
+    <rect class="surface" x="88" y="84" width="160" height="56" rx="2"/>
+    <text class="mono-label" x="104" y="100">source</text>
+    <text class="mono-body" x="104" y="120">solar panel</text>
+    <text class="v-mid num" x="104" y="136">6.0 – 7.0V</text>
+
+    <!-- BQ24074 -->
+    <rect class="surface" x="312" y="84" width="200" height="56" rx="2"/>
+    <text class="mono-label" x="328" y="100">load out</text>
+    <text class="mono-body" x="328" y="120">bq24074 LOAD/OUT</text>
+    <text class="v-mid num" x="328" y="136">3.0 – 4.4V load rail</text>
+
+    <!-- Buck-Boost -->
+    <rect class="good-box" x="576" y="84" width="200" height="56" rx="2"/>
+    <text class="mono-label" x="592" y="100">regulation</text>
+    <text class="mono-body" x="592" y="120">S7V8F5 buck-boost</text>
+    <text class="v-ok num" x="592" y="136">5.0V regulated</text>
+
+    <!-- USB-C -->
+    <rect class="surface" x="840" y="84" width="160" height="56" rx="2"/>
+    <text class="mono-label" x="856" y="100">field lead</text>
+    <text class="mono-body" x="856" y="120">cut usb-a→c cable</text>
+    <text class="v-ok num" x="856" y="136">5.0V</text>
+
+    <!-- Thingy -->
+    <rect class="surface" x="1064" y="84" width="160" height="56" rx="2"/>
+    <text class="mono-label" x="1080" y="100">node</text>
+    <text class="mono-body" x="1080" y="120">thingy:91 x</text>
+    <text class="v-ok num" x="1080" y="136">5.0V ✓ always safe</text>
+
+    <!-- Wires between blocks -->
+    <line class="wire-red" x1="248" y1="108" x2="312" y2="108"/>
+    <line class="wire-red" x1="512" y1="108" x2="576" y2="108"/>
+    <line class="wire-green" x1="776" y1="108" x2="840" y2="108"/>
+    <line class="wire-green" x1="1000" y1="108" x2="1064" y2="108"/>
+
+    <!-- Battery tap below BQ24074 -->
+    <rect class="surface" x="312" y="156" width="200" height="48" rx="2"/>
+    <text class="mono-label" x="328" y="172">buffer</text>
+    <text class="mono-body" x="328" y="192">ext battery 10Ah → LIPO</text>
+    <line class="wire-blue" x1="412" y1="140" x2="412" y2="156"/>
+
+    <!-- Stock battery below Thingy -->
+    <rect class="surface" x="1064" y="156" width="160" height="48" rx="2"/>
+    <text class="mono-label" x="1080" y="172">internal</text>
+    <text class="mono-body" x="1080" y="192">stock battery in</text>
+    <line class="wire-blue" x1="1144" y1="140" x2="1144" y2="156"/>
+
+    <!-- Arrow labels -->
+    <text class="mono-dim" x="256" y="100">pass-thru</text>
+    <text class="mono-dim" x="520" y="100">in</text>
+    <text class="mono-dim" x="784" y="100">5V</text>
+    <text class="mono-dim" x="1008" y="100">usb-c</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION 2: Voltage trace table              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g>
+    <text class="mono-label" x="72" y="252">voltage trace — all operating conditions</text>
+    <rect class="surface" x="64" y="260" width="1272" height="280" rx="2"/>
+
+    <!-- Column headers -->
+    <line class="divider" x1="64" y1="288" x2="1336" y2="288"/>
+    <text class="col-head" x="80" y="280">condition</text>
+    <text class="col-head" x="270" y="280">solar</text>
+    <text class="col-head" x="420" y="280">bq24074 out</text>
+    <text class="col-head" x="600" y="280">s7v8f5 mode</text>
+    <text class="col-head" x="770" y="280">s7v8f5 out</text>
+    <text class="col-head" x="920" y="280">thingy usb</text>
+    <text class="col-head" x="1080" y="280">thingy int bat</text>
+
+    <!-- Vertical dividers -->
+    <line class="divider" x1="256" y1="260" x2="256" y2="540"/>
+    <line class="divider" x1="400" y1="260" x2="400" y2="540"/>
+    <line class="divider" x1="580" y1="260" x2="580" y2="540"/>
+    <line class="divider" x1="750" y1="260" x2="750" y2="540"/>
+    <line class="divider" x1="900" y1="260" x2="900" y2="540"/>
+    <line class="divider" x1="1060" y1="260" x2="1060" y2="540"/>
+
+    <!-- Row 1: Full sun, battery charging -->
+    <text class="row-head" x="80" y="316">full sun, bat charging</text>
+    <text class="cell-amber" x="270" y="316">~6.0–6.5V</text>
+    <text class="cell-amber" x="420" y="316">~4.2–4.4V</text>
+    <text class="cell" x="600" y="316">BOOST ↑</text>
+    <text class="cell-green" x="770" y="316">5.0V</text>
+    <text class="cell-green" x="920" y="316">5.0V ✓</text>
+    <text class="cell" x="1080" y="316">charging</text>
+    <line class="divider" x1="80" y1="326" x2="1320" y2="326"/>
+
+    <!-- Row 2: Full sun, battery full -->
+    <text class="row-head" x="80" y="352">full sun, bat full</text>
+    <text class="cell-red" x="270" y="352">~6.5–7.0V</text>
+    <text class="cell-amber" x="420" y="352">~4.3–4.4V</text>
+    <text class="cell" x="600" y="352">BOOST ↑</text>
+    <text class="cell-green" x="770" y="352">5.0V</text>
+    <text class="cell-green" x="920" y="352">5.0V ✓</text>
+    <text class="cell" x="1080" y="352">4.2V full</text>
+    <line class="divider" x1="80" y1="362" x2="1320" y2="362"/>
+
+    <!-- Row 3: Dusk / heavy clouds -->
+    <text class="row-head" x="80" y="388">dusk / heavy clouds</text>
+    <text class="cell-amber" x="270" y="388">~4.0–5.0V</text>
+    <text class="cell-amber" x="420" y="388">~3.7–4.4V</text>
+    <text class="cell" x="600" y="388">BOOST ↑</text>
+    <text class="cell-green" x="770" y="388">5.0V</text>
+    <text class="cell-green" x="920" y="388">5.0V ✓</text>
+    <text class="cell" x="1080" y="388">charging</text>
+    <line class="divider" x1="80" y1="398" x2="1320" y2="398"/>
+
+    <!-- Row 4: Night, battery full -->
+    <text class="row-head" x="80" y="424">night, bat full</text>
+    <text class="cell-dim" x="270" y="424">0V</text>
+    <text class="cell-amber" x="420" y="424">~4.1V</text>
+    <text class="cell" x="600" y="424">BOOST ↑</text>
+    <text class="cell-green" x="770" y="424">5.0V</text>
+    <text class="cell-green" x="920" y="424">5.0V ✓</text>
+    <text class="cell" x="1080" y="424">~4.2V</text>
+    <line class="divider" x1="80" y1="434" x2="1320" y2="434"/>
+
+    <!-- Row 5: Night, battery nominal -->
+    <text class="row-head" x="80" y="460">night, bat nominal</text>
+    <text class="cell-dim" x="270" y="460">0V</text>
+    <text class="cell-amber" x="420" y="460">~3.7V</text>
+    <text class="cell" x="600" y="460">BOOST ↑</text>
+    <text class="cell-green" x="770" y="460">5.0V</text>
+    <text class="cell-green" x="920" y="460">5.0V ✓</text>
+    <text class="cell" x="1080" y="460">~4.0V</text>
+    <line class="divider" x1="80" y1="470" x2="1320" y2="470"/>
+
+    <!-- Row 6: Night, battery depleted -->
+    <text class="row-head" x="80" y="496">night, bat depleted</text>
+    <text class="cell-dim" x="270" y="496">0V</text>
+    <text class="cell-red" x="420" y="496">~3.0V</text>
+    <text class="cell" x="600" y="496">BOOST ↑</text>
+    <text class="cell-green" x="770" y="496">5.0V</text>
+    <text class="cell-green" x="920" y="496">5.0V ✓</text>
+    <text class="cell" x="1080" y="496">ride-through</text>
+    <line class="divider" x1="80" y1="506" x2="1320" y2="506"/>
+
+    <!-- Footer note -->
+    <text class="mono-dim" x="80" y="530">bq24074 LOAD/OUT per vendor: ~3.0–4.4V / s7v8f5 input: 2.7–11.8V / output: 5.0V</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION 3: Old vs New comparison            -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g>
+    <text class="mono-label" x="72" y="568">why the regulator matters — thingy usb-c voltage comparison</text>
+    <rect class="surface" x="64" y="576" width="620" height="180" rx="2"/>
+
+    <line class="divider" x1="64" y1="604" x2="684" y2="604"/>
+    <text class="col-head" x="80" y="596">condition</text>
+    <line class="divider" x1="280" y1="576" x2="280" y2="756"/>
+    <text class="col-head" x="296" y="596">bad: direct load out</text>
+    <line class="divider" x1="484" y1="576" x2="484" y2="756"/>
+    <text class="col-head" x="500" y="596">new: s7v8f5 buck-boost</text>
+
+    <text class="row-head" x="80" y="632">full sun, bat full</text>
+    <text class="cell-red" x="296" y="632">~4.4V ✗ NOT USB 5V</text>
+    <text class="cell-green" x="500" y="632">5.0V ✓</text>
+    <line class="divider" x1="80" y1="642" x2="668" y2="642"/>
+
+    <text class="row-head" x="80" y="668">full sun, charging</text>
+    <text class="cell-red" x="296" y="668">~4.2V ✗ NOT USB 5V</text>
+    <text class="cell-green" x="500" y="668">5.0V ✓</text>
+    <line class="divider" x1="80" y1="678" x2="668" y2="678"/>
+
+    <text class="row-head" x="80" y="704">night, bat nominal</text>
+    <text class="cell-red" x="296" y="704">~3.7V ✗ LOW</text>
+    <text class="cell-green" x="500" y="704">5.0V ✓</text>
+    <line class="divider" x1="80" y1="714" x2="668" y2="714"/>
+
+    <text class="row-head" x="80" y="740">night, bat depleted</text>
+    <text class="cell-red" x="296" y="740">~3.0V ✗ LOW</text>
+    <text class="cell-green" x="500" y="740">5.0V ✓</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION 4: BQ24074 role callout             -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g>
+    <text class="mono-label" x="736" y="568">what each component does</text>
+    <rect class="surface" x="728" y="576" width="608" height="180" rx="2"/>
+
+    <text class="mono-blue" x="744" y="604">bq24074</text>
+    <text class="mono-body" x="744" y="626">charges external battery from solar</text>
+    <text class="mono-body" x="744" y="646">load-shares: seamless solar↔battery switchover</text>
+    <text class="mono-dim" x="744" y="666">LOAD/OUT is limited to ~4.4V, not USB 5V</text>
+    <line class="divider" x1="744" y1="678" x2="1320" y2="678"/>
+
+    <text class="mono-blue" x="744" y="700">s7v8f5 buck-boost</text>
+    <text class="mono-body" x="744" y="720">regulates 3.0–4.4V input → clean 5.0V output</text>
+    <text class="mono-body" x="744" y="740">boosts bq24074 load rail to USB-C voltage</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- Status bar                                  -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g>
+    <rect class="good-box" x="64" y="788" width="1272" height="32" rx="2"/>
+    <text class="mono-label" x="80" y="808">status</text>
+    <text class="mono-green" x="136" y="808">architecture update.</text>
+    <text class="mono-body" x="320" y="808">verify bq24074 load/out with dmm; present regulated 5.0v to thingy usb-c.</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- Wire map compact                            -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g>
+    <text class="mono-label" x="72" y="848">wire map — updated</text>
+    <rect class="surface" x="64" y="856" width="1272" height="88" rx="2"/>
+
+    <text class="mono-body" x="80" y="880">solar red → bq24074 VBUS</text>
+    <text class="mono-body" x="80" y="900">battery red → [2A polyfuse] → bq24074 LIPO</text>
+    <text class="mono-body" x="80" y="920">bq24074 LOAD/OUT → s7v8f5 VIN</text>
+
+    <text class="mono-body" x="540" y="880">s7v8f5 VOUT → cut usb cable red (5V)</text>
+    <text class="mono-body" x="540" y="900">s7v8f5 GND → cut usb cable black (GND)</text>
+    <text class="mono-dim" x="540" y="920">insulate green (D+) and white (D−) — heat shrink</text>
+
+    <text class="mono-body" x="1040" y="880">usb-c → thingy</text>
+    <text class="mono-dim" x="1040" y="900">stock battery untouched</text>
+    <text class="mono-dim" x="1040" y="920">all GND shared rail</text>
+  </g>
+</svg>

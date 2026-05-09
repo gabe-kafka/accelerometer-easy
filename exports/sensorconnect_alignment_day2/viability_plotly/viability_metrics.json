@@ -1,0 +1,19 @@
+{
+  "alignment_source": "/Users/gabe/projects/accelerometer-easy/exports/sensorconnect_alignment_day2/sensorconnect_day2_thingy_peak_aligned_30s_rawmag.csv",
+  "calibration_model": "lord_mag_g = scale * thingy_mag_counts + bias",
+  "scale_g_per_count": 0.0002791767365608815,
+  "bias_g": -0.06301839408461829,
+  "rmse_g": 0.043529080246136255,
+  "mean_bias_g": -6.290125115927553e-16,
+  "pearson_correlation": 0.9385540433777634,
+  "normalized_rmse_by_lord_range": 0.04142542126612893,
+  "normalized_rmse_by_lord_rms": 0.040916346373494755,
+  "fft_frequency_range_hz": [
+    0,
+    12.5
+  ],
+  "fft_amplitude_correlation_0_to_12_5_hz": 0.9262880688524097,
+  "fft_amplitude_rmse_g_0_to_12_5_hz": 0.0030351258855169957,
+  "sample_count": 3900,
+  "duration_s": 30.460937488
+}

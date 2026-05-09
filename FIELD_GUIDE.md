@@ -10,6 +10,10 @@
 ```
 □ Thingy:91 X with firmware flashed (ADXL367 onboard — no wiring needed)
 □ Solar panel (2W) with lead wire
+□ BQ24074 solar charger/load-share board
+□ Pololu S7V8F5 buck-boost regulator
+□ External 10Ah LiPo buffer battery + 2A polyfuse
+□ Cut USB-A→USB-C power lead (red = 5V, black = GND; D+/D- insulated)
 □ Mounting hardware (Phase 1: hose clamps / Phase 2: L-bracket + bolts)
 □ Cable ties (UV-rated)
 □ SIM card installed and activated (if not using iBasis eSIM)
@@ -61,16 +65,24 @@ Label the physical unit manually for field identification. Write on label tape, 
 ### 1.4 Verify Solar Charging
 
 ```
-1. Connect solar panel to charge input
-2. Place panel under desk lamp or sunlight
-3. Check battery voltage trending up in RTT log
-4. Confirm no thermal issues (PMIC should stay < 40°C)
+1. Wire solar panel → BQ24074 VBUS.
+2. Wire external 10Ah LiPo red lead → 2A polyfuse → BQ24074 LIPO.
+3. Wire BQ24074 LOAD/OUT -> S7V8F5 VIN.
+4. Wire S7V8F5 VOUT/GND → cut USB-C cable red/black.
+5. Insulate USB green/white D+/D− wires with heat shrink.
+6. Plug USB-C into Thingy:91 X.
+7. Place panel under desk lamp or sunlight.
+8. Confirm S7V8F5 output is 5.0V before plugging into Thingy.
+9. Check Thingy `VBUS: present` and battery voltage/charge state in RTT log.
+10. Confirm no thermal issues (charger/regulator/PMIC should stay < 40°C).
 ```
+
+Reference figure: `public/diagrams/thingy91x-voltage-trace.svg`
 
 ### 1.5 Power Test Pads
 
-Use a multimeter in DC voltage mode. Put the black probe on `TP15` or
-`TP16` ground, then measure these pads with the red probe:
+Use a multimeter in DC voltage mode. For Thingy:91 X pads, put the black probe
+on `TP15` or `TP16` ground, then measure these pads with the red probe:
 
 | Pad | Signal | Expected reading | Meaning |
 |-----|--------|------------------|---------|
@@ -92,6 +104,20 @@ If `TP12` is ~5 V but `TP4` does not rise over 5-10 minutes, USB power is
 present but the battery charger is not actively charging. Check PMIC charger
 state, firmware charge policy, battery connector, and charge-path hardware.
 
+For the external solar front end, also verify these rails before deployment:
+
+| Node | Expected reading | Meaning |
+|------|------------------|---------|
+| Solar panel leads | ~6.0-7.0 V in full sun | Panel producing input voltage |
+| BQ24074 LOAD/OUT | ~3.0-4.4 V | Load-share rail; not USB 5V |
+| S7V8F5 VOUT | 5.0 V | Safe regulated USB-C input for Thingy |
+| Thingy `TP12` / `VBUS` | ~5 V | Regulated external power reaches Thingy |
+
+Do not connect BQ24074 LOAD/OUT directly to Thingy USB-C. It is not a USB 5V
+rail and may be too low for reliable VBUS behavior. Also do not connect the
+solar/VBUS charger input directly to Thingy USB-C; that upstream rail can exceed
+5V.
+
 ---
 
 ## 2. Installation — Phase 1 (CityLab)
@@ -111,9 +137,10 @@ Pick a structural member where you expect measurable ambient vibration. Prefer m
      X = along member axis
      Y = transverse
      Z = vertical (gravity)
-5. Route solar panel cable, zip-tie for strain relief
-6. Position solar panel: south-facing, ~30° tilt, clear of shadows
-7. Secure panel with zip ties or VHB tape
+5. Route solar panel cable to BQ24074, zip-tie for strain relief
+6. Route regulated USB-C lead from S7V8F5 to Thingy, zip-tie for strain relief
+7. Position solar panel: south-facing, ~30° tilt, clear of shadows
+8. Secure panel with zip ties or VHB tape
 ```
 
 ### 2.3 Verify
@@ -145,10 +172,11 @@ Pick a structural member where you expect measurable ambient vibration. Prefer m
    - Drill not required if angle has existing holes
    - If drilling: 6.5mm bit, deburr, apply cold-galv touch-up paint
 2. Bolt IP67 enclosure to L-bracket with included hardware
-3. Route solar panel cable through IP67 cable gland, tighten
-4. Mount solar panel above node: south-facing, zip-tied to tower member
-5. Verify cable gland is fully sealed — pull-test the cable
-6. Record GPS coordinates, tower ID, member ID, axis orientation
+3. Route solar panel cable through IP67 cable gland to BQ24074, tighten
+4. Route regulated USB-C lead from S7V8F5 to Thingy through separate gland
+5. Mount solar panel above node: south-facing, zip-tied to tower member
+6. Verify cable glands are fully sealed — pull-test both cables
+7. Record GPS coordinates, tower ID, member ID, axis orientation
 ```
 
 ### 3.3 Verify
@@ -173,6 +201,11 @@ Same as Phase 1 §2.3. Additionally:
 3. Check battery_v column — all nodes > 3.3V
 4. Glance at accel trends — any sudden shifts warrant investigation
 ```
+
+`battery_v` is the Thingy internal LiPo voltage, not the external 10Ah buffer
+state of charge. In the updated power architecture, also watch firmware VBUS
+status where available: `VBUS: present` means the BQ24074/S7V8F5 chain is
+feeding the Thingy through regulated USB-C power.
 
 ### 4.2 Weekly Check
 
@@ -213,7 +246,8 @@ Same as Phase 1 §2.3. Additionally:
 | Reflash fails with access port protected / APPROTECT | Firmware/TF-M/MCUboot chain re-enabled readback protection | Close all J-Link/RTT sessions, power-cycle if needed, run `nrfutil device recover --family nrf91 --serial-number <SERIAL>`, then program `build/merged.hex`. |
 | No packets for > 2 hr | PSM timer stuck / modem crash | Wait for watchdog reset (30 sec). If persists > 6 hr, power cycle. |
 | Packet received but peaks all < 0.1 mg | ADXL367 in standby / SPI fault | Reflash firmware. Check onboard SPI bus via RTT debug. |
-| Battery dropping despite solar | Panel disconnected or shaded | Check cable gland, verify panel orientation. |
+| Battery dropping despite solar | Panel disconnected, shaded, BQ24074 not charging, S7V8F5 not producing 5V, or USB-C lead fault | Check panel voltage, BQ24074 LOAD/OUT, S7V8F5 VOUT, Thingy TP12/VBUS, cable glands, and panel orientation. |
+| Thingy USB-C sees >5.25V | Solar/VBUS charger input or another upstream rail reached the USB-C lead | Disconnect immediately. Rewire through S7V8F5 and verify 5.0V before reconnecting Thingy. |
 | RSSI degrading over time | Antenna corrosion / enclosure moisture | Inspect antenna area, check for condensation inside enclosure. |
 | Frequency shift > 5% sudden | Structural event OR mount loosened | Check mount first (re-torque clamp/bolts). If mount solid → real structural change. |
 | HTTPS POST fails repeatedly | Certificate expired, SIM data exhausted, or Supabase down | Check cert expiry (GlobalSign Root CA exp 2028). Check SIM data balance. Check Supabase status. |
@@ -224,6 +258,8 @@ Same as Phase 1 §2.3. Additionally:
 
 ## 6. Battery Swap
 
+### Thingy Internal Battery
+
 ```
 1. Open Thingy:91 enclosure (4× Phillips screws on stock shell)
 2. Disconnect LiPo JST connector
@@ -231,6 +267,16 @@ Same as Phase 1 §2.3. Additionally:
 4. Reassemble, verify boot via RTT or wait for heartbeat
 5. Expected frequency: once per ~3 months if solar panel functional,
    never if solar panel and weather are cooperative
+```
+
+### External 10Ah Buffer Battery
+
+```
+1. Power down the node or unplug the regulated USB-C lead from Thingy.
+2. Disconnect solar input from BQ24074.
+3. Disconnect external LiPo from BQ24074 LIPO.
+4. Replace with same-voltage 3.7V LiPo pack and keep the 2A polyfuse inline.
+5. Reconnect solar, then verify S7V8F5 VOUT = 5.0V before reconnecting Thingy.
 ```
 
 ---
@@ -254,6 +300,7 @@ Same as Phase 1 §2.3. Additionally:
 PRD.md
 ├── SRS.md
 ├── ARCHITECTURE.md
+├── HARDWARE_SPEC.md
 ├── POWER_BUDGET.md
 ├── BOM.md
 ├── FIRMWARE.md

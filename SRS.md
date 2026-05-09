@@ -49,7 +49,11 @@ SRS-405 [S] Battery-only autonomy ≥ 14 days                      → SC-1
 SRS-406 [M] Sleep current ≤ 50 µA                                → SC-1
 SRS-407 [M] Low-battery cutoff at 3.0V                           → SC-4
 SRS-408 [S] Battery V in every feature packet                    → SC-3
-SRS-409 [C] MPPT charge controller (BQ25570)                     → SC-1
+SRS-409 [M] External 10Ah LiPo buffer for field reserve          → SC-1
+SRS-410 [M] Solar charger/load-share stage (BQ24074 or equiv)    → SC-1
+SRS-411 [M] Regulated 5.0V USB-C input via buck-boost            → SC-4
+SRS-412 [M] No raw charger LOAD/OUT or solar/VBUS rail may feed Thingy USB → SC-4
+SRS-413 [C] MPPT charge controller (BQ25570)                     → SC-1
 
 # ── ENVIRONMENTAL ──
 SRS-501 [M] Temp range: -10°C to +60°C                           → SC-4
@@ -108,10 +112,10 @@ SRS-902 [S] JSON encoding (human-readable, ~80 bytes)            → SRS-303
 ## Traceability
 
 ```
-SC-1  → 304 306 307 401-409 703 706 804
+SC-1  → 304 306 307 401-410 413 703 706 804
 SC-2  → 101-107 201-206 601-602 704
 SC-3  → 203-204 303-305 408 801-807 901-903
-SC-4  → 501-507 603 605-606
+SC-4  → 407 411-412 501-507 603 605-606
 SC-5  → 205 507 805
 SC-6  → 503-505 604
 C-1   → 401        C-2 → 605-606 707
