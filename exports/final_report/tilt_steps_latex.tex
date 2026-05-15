@@ -1,0 +1,63 @@
+\documentclass[border=5pt]{standalone}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{lmodern}
+\begin{document}
+\begin{minipage}{6.35in}
+\footnotesize
+\setlength{\parindent}{0pt}
+Tilt extraction is a change-from-install calculation: first learn the mounted
+gravity direction, then report later angle changes relative to that starting
+position.
+
+\begin{enumerate}[leftmargin=0.23in,itemsep=2pt,topsep=4pt,parsep=0pt]
+\item \textbf{Capture the initial calibration window.}
+After the node is mounted and still, collect
+\[
+C=\{\mathbf{a}_i=[x_i,y_i,z_i]^T\}_{i=1}^{n}.
+\]
+This quiet window is the zero position.
+
+\item \textbf{Estimate gravity and scale.}
+\[
+\mathbf{g}_0=\frac{1}{n}\sum_{i=1}^{n}\mathbf{a}_i,\qquad
+s=\|\mathbf{g}_0\|_2,\qquad
+\hat{\mathbf{d}}=\frac{\mathbf{g}_0}{s}.
+\]
+Here \(s\) is counts per \(g\), and \(\hat{\mathbf{d}}\) is the mounted down direction.
+
+\item \textbf{Build the local horizontal axes.}
+\[
+\mathbf{p}_x=\mathbf{e}_x-(\mathbf{e}_x^T\hat{\mathbf{d}})\hat{\mathbf{d}},\qquad
+\mathbf{u}_x=\frac{\mathbf{p}_x}{\|\mathbf{p}_x\|_2},\qquad
+\mathbf{u}_y=\frac{\hat{\mathbf{d}}\times\mathbf{u}_x}
+{\|\hat{\mathbf{d}}\times\mathbf{u}_x\|_2}.
+\]
+If sensor \(x\) is nearly vertical, seed the plane with sensor \(y\) instead.
+
+\item \textbf{Project each new \(x,y,z\) reading.}
+For each \(\mathbf{a}(t)=[x(t),y(t),z(t)]^T\),
+\[
+v(t)=\frac{\mathbf{a}(t)^T\hat{\mathbf{d}}}{s},\qquad
+h_x(t)=\frac{\mathbf{a}(t)^T\mathbf{u}_x}{s},\qquad
+h_y(t)=\frac{\mathbf{a}(t)^T\mathbf{u}_y}{s}.
+\]
+This converts raw counts into vertical and horizontal components in \(g\).
+
+\item \textbf{Convert projected acceleration to raw tilt.}
+\[
+\theta_x(t)=\operatorname{atan2}(h_y(t),v(t))\frac{180}{\pi},\qquad
+\theta_y(t)=\operatorname{atan2}(h_x(t),v(t))\frac{180}{\pi}.
+\]
+
+\item \textbf{Subtract the initial position.}
+\[
+\Delta\theta_x(t)=\theta_x(t)-\bar{\theta}_x,\qquad
+\Delta\theta_y(t)=\theta_y(t)-\bar{\theta}_y.
+\]
+\(\bar{\theta}_x\) and \(\bar{\theta}_y\) are the calibration-window means, so the final
+output is tilt change from the mounted starting position.
+\end{enumerate}
+\end{minipage}
+\end{document}
