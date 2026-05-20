@@ -11,3 +11,6 @@ dist/
 *.tsbuildinfo
 ~$*.docx
 .$*.drawio.bkp
+.docx_render*/
+__pycache__/
+*.pyc

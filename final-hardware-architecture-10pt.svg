@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="6.5in" height="5.5in" viewBox="0 0 468 396">
+  <defs>
+    <style>
+      .title { font: 700 13px Arial, Helvetica, sans-serif; fill: #111111; }
+      .section { font: 700 11px Arial, Helvetica, sans-serif; fill: #111111; }
+      .label { font: 10px Arial, Helvetica, sans-serif; fill: #555555; }
+      .text { font: 10px Arial, Helvetica, sans-serif; fill: #111111; }
+      .strong { font: 700 10px Arial, Helvetica, sans-serif; fill: #111111; }
+      .small-bold { font: 700 10px Arial, Helvetica, sans-serif; }
+      .orange { fill: #d97706; stroke: #d97706; }
+      .blue { fill: #0057ff; stroke: #0057ff; }
+      .green { fill: #16a34a; stroke: #16a34a; }
+      .cyan { fill: #06a6c9; stroke: #06a6c9; }
+      .red { fill: #dc2626; stroke: #dc2626; }
+      .gray { fill: #505050; stroke: #505050; }
+      .box { fill: #ffffff; stroke-width: 1.25; rx: 1.5; }
+      .band { fill: #ffffff; stroke: #d4d4d4; stroke-width: 1; rx: 2; }
+      .arrow { fill: none; stroke-width: 1.7; marker-end: url(#arrow); }
+      .arrowBlue { fill: none; stroke: #0057ff; stroke-width: 2.2; marker-end: url(#arrowBlue); }
+      .arrowGreen { fill: none; stroke: #16a34a; stroke-width: 1.8; marker-end: url(#arrowGreen); }
+      .arrowGray { fill: none; stroke: #505050; stroke-width: 1.5; marker-end: url(#arrowGray); }
+      .arrowCyan { fill: none; stroke: #06a6c9; stroke-width: 1.8; marker-end: url(#arrowCyan); stroke-dasharray: 7 4; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#d97706" />
+    </marker>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#0057ff" />
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#16a34a" />
+    </marker>
+    <marker id="arrowGray" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#505050" />
+    </marker>
+    <marker id="arrowCyan" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#06a6c9" />
+    </marker>
+  </defs>
+
+  <rect width="468" height="396" fill="#ffffff" />
+  <text class="title" x="10" y="20">FIG-3.1A / SOLAR HARDWARE SPEC AND THINGY91X LOCAL</text>
+
+  <rect class="band" x="10" y="34" width="448" height="148" />
+  <text class="section" x="234" y="53" text-anchor="middle">SOLAR HARDWARE / EXTERNAL POWER CHAIN</text>
+
+  <rect class="box orange" x="22" y="68" width="86" height="62" />
+  <text x="30" y="84">
+    <tspan class="label">POWER INPUT</tspan>
+    <tspan class="strong" x="30" dy="13">SOLAR PANEL</tspan>
+    <tspan class="text" x="30" dy="13">Voltaic 10W, 6V</tspan>
+    <tspan class="small-bold orange" x="30" dy="13">VIN 6-7 V</tspan>
+  </text>
+
+  <rect class="box gray" x="126" y="68" width="96" height="62" />
+  <text x="134" y="84">
+    <tspan class="label">LOAD SHARE</tspan>
+    <tspan class="strong" x="134" dy="13">BQ24074</tspan>
+    <tspan class="text" x="134" dy="13">Adafruit 4755</tspan>
+    <tspan class="text" x="134" dy="13">3.0-4.4 V</tspan>
+  </text>
+
+  <rect class="box blue" x="240" y="68" width="94" height="62" />
+  <text x="248" y="84">
+    <tspan class="label">REGULATOR</tspan>
+    <tspan class="strong" x="248" dy="13">S7V8F5</tspan>
+    <tspan class="text" x="248" dy="13">buck-boost</tspan>
+    <tspan class="small-bold blue" x="248" dy="13">OUT 5.0 V</tspan>
+  </text>
+
+  <rect class="box blue" x="352" y="68" width="86" height="62" />
+  <text x="360" y="84">
+    <tspan class="label">REGULATED</tspan>
+    <tspan class="strong" x="360" dy="13">USB-C LEAD</tspan>
+    <tspan class="text" x="360" dy="13">power only</tspan>
+    <tspan class="small-bold blue" x="360" dy="13">VBUS/GND</tspan>
+  </text>
+
+  <rect class="box green" x="134" y="140" width="174" height="34" />
+  <text x="142" y="154">
+    <tspan class="strong">EXTERNAL LiPo BUFFER</tspan>
+    <tspan class="text" x="142" dy="13">10 Ah reserve; SOC not measured</tspan>
+  </text>
+
+  <line class="arrow" x1="108" y1="99" x2="126" y2="99" />
+  <line class="arrowBlue" x1="222" y1="99" x2="240" y2="99" />
+  <line class="arrowBlue" x1="334" y1="99" x2="352" y2="99" />
+  <line class="arrowGreen" x1="221" y1="140" x2="184" y2="130" />
+
+  <path class="arrowBlue" d="M395 130 L395 215 L60 215 L60 247" />
+  <text class="small-bold blue" x="226" y="210">5 V to Thingy</text>
+
+  <rect class="box red" x="92" y="192" width="284" height="42" />
+  <text x="102" y="207">
+    <tspan class="strong">TELEMETRY LIMIT:</tspan>
+    <tspan class="text"> firmware reports internal Thingy</tspan>
+    <tspan class="text" x="102" dy="13">power state only; external 10 Ah SOC is not measured.</tspan>
+  </text>
+
+  <rect class="band" x="10" y="247" width="448" height="139" />
+  <text class="section" x="234" y="266" text-anchor="middle">THINGY91X LOCAL NODE AND DATA PATH</text>
+
+  <rect class="box blue" x="22" y="280" width="85" height="52" />
+  <text x="30" y="296">
+    <tspan class="label">INPUT</tspan>
+    <tspan class="strong" x="30" dy="13">USB-C LEAD</tspan>
+    <tspan class="text" x="30" dy="13">5 V / GND</tspan>
+  </text>
+
+  <rect class="box gray" x="124" y="280" width="90" height="52" />
+  <text x="132" y="296">
+    <tspan class="label">PMIC</tspan>
+    <tspan class="strong" x="132" dy="13">nPM1300</tspan>
+    <tspan class="text" x="132" dy="13">VBUS manager</tspan>
+  </text>
+
+  <rect class="box green" x="232" y="280" width="90" height="52" />
+  <text x="240" y="296">
+    <tspan class="label">STORAGE</tspan>
+    <tspan class="strong" x="240" dy="13">LiPo</tspan>
+    <tspan class="text" x="240" dy="13">1350 mAh</tspan>
+  </text>
+
+  <rect class="box gray" x="22" y="344" width="66" height="34" />
+  <text x="30" y="358">
+    <tspan class="strong">3-AXIS</tspan>
+    <tspan class="strong" x="30" dy="13">MOTION</tspan>
+  </text>
+
+  <rect class="box gray" x="104" y="334" width="88" height="52" />
+  <text x="112" y="350">
+    <tspan class="label">SENSOR</tspan>
+    <tspan class="strong" x="112" dy="13">ADXL367</tspan>
+    <tspan class="text" x="112" dy="13">14-bit counts</tspan>
+  </text>
+
+  <rect class="box cyan" x="208" y="334" width="104" height="52" />
+  <text x="216" y="350">
+    <tspan class="label">COMPUTE / LTE-M</tspan>
+    <tspan class="strong" x="216" dy="13">nRF9151 SiP</tspan>
+    <tspan class="small-bold cyan" x="216" dy="13">HTTPS POST</tspan>
+  </text>
+
+  <rect class="box cyan" x="330" y="322" width="110" height="64" />
+  <text x="338" y="338">
+    <tspan class="label">REMOTE DATA</tspan>
+    <tspan class="strong" x="338" dy="13">SUPABASE API</tspan>
+    <tspan class="text" x="338" dy="13">JSON batches</tspan>
+    <tspan class="small-bold cyan" x="338" dy="13">HTTP 201</tspan>
+  </text>
+
+  <line class="arrowBlue" x1="107" y1="306" x2="124" y2="306" />
+  <line class="arrowGreen" x1="214" y1="306" x2="232" y2="306" />
+  <line class="arrowGray" x1="88" y1="361" x2="104" y2="361" />
+  <line class="arrowCyan" x1="192" y1="360" x2="208" y2="360" />
+  <line class="arrowCyan" x1="312" y1="360" x2="330" y2="360" />
+</svg>
