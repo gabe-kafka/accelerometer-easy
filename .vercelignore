@@ -1,0 +1,8 @@
+firmware
+exports
+deliverables
+*.pdf
+*.drawio
+*.svg
+progress.txt
+sensor_selection_report.pdf
