@@ -118,6 +118,7 @@ export function StormIndexPage() {
         </div>
         <div className="raw-panel__body">
           <p className="state">{FORECAST_EMPTY_MESSAGE}</p>
+          <p className="storm-strip__hint">Swipe sideways for all 14 days.</p>
           <div className="storm-strip" role="list" aria-label="14-day forecast strip">
             {forecastDays.map((day) => (
               <ForecastCard key={day.date} day={day} />
@@ -132,6 +133,29 @@ export function StormIndexPage() {
           <span>backwards wind / storm intensity</span>
         </div>
         <div className="raw-panel__body">
+          <ul className="storm-log-cards">
+            <li className="storm-log-card">
+              <span className="storm-chip storm-chip--muted">EXAMPLE</span>
+              <dl>
+                <div>
+                  <dt>When</dt>
+                  <dd>{formatObservedAt(HISTORIC_EXAMPLE_ROW.observedAt)}</dd>
+                </div>
+                <div>
+                  <dt>Peak wind</dt>
+                  <dd>{formatCount(HISTORIC_EXAMPLE_ROW.peakWind)}</dd>
+                </div>
+                <div>
+                  <dt>Storm intensity</dt>
+                  <dd>{formatCount(HISTORIC_EXAMPLE_ROW.stormIntensity)}</dd>
+                </div>
+                <div>
+                  <dt>Notes</dt>
+                  <dd>Layout only. Not a recorded event.</dd>
+                </div>
+              </dl>
+            </li>
+          </ul>
           <div className="storm-table-wrap">
             <table className="storm-table">
               <thead>
