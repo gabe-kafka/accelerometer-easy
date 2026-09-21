@@ -1,0 +1,163 @@
+.storm-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.storm-day {
+  display: grid;
+  flex: 0 0 108px;
+  gap: 6px;
+  border: 1px dashed #c3cad6;
+  background: #fbfcfe;
+  padding: 12px;
+}
+
+.storm-day__date,
+.storm-day__unit,
+.storm-site__node,
+.storm-site__caption {
+  color: #667085;
+  font-size: 12px;
+}
+
+.storm-day__value,
+.storm-site__ratio {
+  color: #98a2b3;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.storm-table-wrap {
+  overflow-x: auto;
+}
+
+.storm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.storm-table th {
+  text-align: left;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #d8dde6;
+  padding: 8px 12px;
+}
+
+.storm-table td {
+  border-bottom: 1px solid #eef2f7;
+  padding: 12px;
+  vertical-align: middle;
+}
+
+.storm-table__example td {
+  color: #98a2b3;
+}
+
+.storm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d8dde6;
+  background: #f7f9fc;
+  color: #3f4652;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.storm-chip--muted {
+  margin-right: 8px;
+  color: #98a2b3;
+  text-transform: uppercase;
+}
+
+.storm-collected__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.storm-sites {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.storm-site {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  border: 1px solid #d8dde6;
+  background: #fbfcfe;
+  padding: 16px;
+  text-align: center;
+}
+
+.storm-site__meter {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.storm-site h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.storm-site p {
+  margin: 0;
+}
+
+.storm-ring {
+  width: 84px;
+  height: 84px;
+  transform: rotate(-90deg);
+}
+
+.storm-ring__track,
+.storm-ring__value {
+  fill: none;
+  stroke-width: 6;
+}
+
+.storm-ring__track {
+  stroke: #e4e7ec;
+}
+
+.storm-ring__value {
+  stroke: #98a2b3;
+  stroke-linecap: round;
+}
+
+.storm-bar {
+  width: 100%;
+  height: 6px;
+  margin-top: 8px;
+  background: #e4e7ec;
+}
+
+.storm-bar span {
+  display: block;
+  height: 100%;
+  background: #98a2b3;
+}
+
+.storm-site__caption {
+  margin-top: 6px;
+}
+
+@media (max-width: 720px) {
+  .storm-sites {
+    grid-template-columns: 1fr;
+  }
+}

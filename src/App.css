@@ -40,6 +40,11 @@ button {
   font-weight: 650;
 }
 
+.viewer-tabs__link {
+  color: inherit;
+  text-decoration: none;
+}
+
 .hero {
   display: grid;
   gap: 4px;

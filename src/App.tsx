@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { FormEvent, PointerEvent, WheelEvent } from 'react';
+import { Link } from 'react-router-dom';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
@@ -1472,6 +1473,9 @@ export function App() {
         >
           Detail Sample Data Viewer
         </button>
+        <Link className="viewer-tabs__tab viewer-tabs__link" to="/storm-index">
+          Storm Index
+        </Link>
       </nav>
 
       {viewerMode === 'big' && <BigSampleViewerShell />}
